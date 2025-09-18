@@ -1,6 +1,6 @@
-# Taskwarrior Rust Library
+# Taskwarrior 3 Rust Library
 
-A Rust library providing idiomatic access to Taskwarrior functionality, following Rust conventions and integrating with local Taskwarrior installations.
+A Rust library providing idiomatic access to Taskwarrior 3.x functionality with TaskChampion backend integration, following Rust conventions and integrating with local Taskwarrior installations.
 
 ## Features
 
@@ -16,7 +16,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-taskwarriorlib = "0.1.0"  # Replace with actual version
+taskwarrior3lib = "0.1.0"  # Replace with actual version
 ```
 
 ## Basic Usage
@@ -24,9 +24,9 @@ taskwarriorlib = "0.1.0"  # Replace with actual version
 ### Configuration and Setup
 
 ```rust
-use taskwarriorlib::config::{ConfigurationBuilder, FileStorageBackend};
-use taskwarriorlib::task::DefaultTaskManager;
-use taskwarriorlib::query::TaskQueryBuilderImpl;
+use taskwarrior3lib::config::{ConfigurationBuilder, FileStorageBackend};
+use taskwarrior3lib::task::DefaultTaskManager;
+use taskwarrior3lib::query::TaskQueryBuilderImpl;
 
 // Create a configuration with default XDG paths
 let config = ConfigurationBuilder::new()
@@ -46,7 +46,7 @@ let mut task_manager = DefaultTaskManager::new(storage)
 ### Adding Tasks
 
 ```rust
-use taskwarriorlib::task::{Task, TaskStatus};
+use taskwarrior3lib::task::{Task, TaskStatus};
 use chrono::Utc;
 
 // Create a new task
@@ -67,7 +67,7 @@ task_manager.add_task(task)
 ### Querying Tasks
 
 ```rust
-use taskwarriorlib::query::TaskQueryBuilderImpl;
+use taskwarrior3lib::query::TaskQueryBuilderImpl;
 
 // Build a query for pending tasks in the "Work" project
 let query = TaskQueryBuilderImpl::new()
@@ -115,8 +115,8 @@ task_manager.delete_task(uuid::Uuid::parse_str("your-task-uuid").unwrap())
 Implement the `StorageBackend` trait for custom storage solutions:
 
 ```rust
-use taskwarriorlib::storage::StorageBackend;
-use taskwarriorlib::task::Task;
+use taskwarrior3lib::storage::StorageBackend;
+use taskwarrior3lib::task::Task;
 use std::collections::HashMap;
 
 struct InMemoryStorage {
@@ -133,7 +133,7 @@ impl StorageBackend for InMemoryStorage {
 Use the hook system for automation:
 
 ```rust
-use taskwarriorlib::hooks::HookSystem;
+use taskwarrior3lib::hooks::HookSystem;
 
 // Create and register hooks
 let mut hook_system = HookSystem::new();
@@ -148,7 +148,7 @@ hook_system.register_hook("on-add", |task| {
 All public APIs return `Result<T, E>` where `E` is typically a `TaskError`:
 
 ```rust
-use taskwarriorlib::error::TaskError;
+use taskwarrior3lib::error::TaskError;
 
 match task_manager.add_task(task) {
     Ok(task) => println!("Task added successfully"),

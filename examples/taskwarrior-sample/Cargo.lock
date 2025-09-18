@@ -690,12 +690,12 @@ dependencies = [
  "chrono",
  "clap",
  "serde_json",
- "taskwarriorlib",
+ "taskwarrior3lib",
  "uuid",
 ]
 
 [[package]]
-name = "taskwarriorlib"
+name = "taskwarrior3lib"
 version = "0.1.0"
 dependencies = [
  "chrono",

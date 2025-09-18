@@ -1,8 +1,8 @@
 use anyhow::Result;
-use taskwarriorlib::query::TaskQueryBuilder;
-use taskwarriorlib::task::{TaskStatus as LibTaskStatus};
-use taskwarriorlib::task::manager::DefaultTaskManager;
-use taskwarriorlib::TaskManager;
+use taskwarrior3lib::query::TaskQueryBuilder;
+use taskwarrior3lib::task::{TaskStatus as LibTaskStatus};
+use taskwarrior3lib::task::manager::DefaultTaskManager;
+use taskwarrior3lib::TaskManager;
 use crate::models::{ListCommand, Task, TaskStatus};
 
 /// Execute the list command
@@ -11,7 +11,7 @@ pub fn execute_list(
     task_manager: &DefaultTaskManager,
 ) -> Result<Vec<Task>> {
     // Build query based on command parameters
-    let mut query_builder = taskwarriorlib::query::TaskQueryBuilderImpl::new();
+    let mut query_builder = taskwarrior3lib::query::TaskQueryBuilderImpl::new();
 
     // Set status filter
     if let Some(status) = cmd.status {
@@ -48,9 +48,9 @@ pub fn execute_list(
             modified: lib_task.modified.unwrap_or(lib_task.entry),
             project: lib_task.project,
             priority: lib_task.priority.map(|p| match p {
-                taskwarriorlib::task::Priority::Low => crate::models::TaskPriority::Low,
-                taskwarriorlib::task::Priority::Medium => crate::models::TaskPriority::Medium,
-                taskwarriorlib::task::Priority::High => crate::models::TaskPriority::High,
+                taskwarrior3lib::task::Priority::Low => crate::models::TaskPriority::Low,
+                taskwarrior3lib::task::Priority::Medium => crate::models::TaskPriority::Medium,
+                taskwarrior3lib::task::Priority::High => crate::models::TaskPriority::High,
             }),
             due: lib_task.due,
         })

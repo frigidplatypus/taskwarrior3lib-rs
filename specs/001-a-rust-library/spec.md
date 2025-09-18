@@ -1,4 +1,4 @@
-# Feature Specification: Rust Library for Taskwarrior Integration
+# Feature Specification: Taskwarrior 3 Rust Library Integration
 
 **Feature Branch**: `001-a-rust-library`  
 **Created**: September 18, 2025  

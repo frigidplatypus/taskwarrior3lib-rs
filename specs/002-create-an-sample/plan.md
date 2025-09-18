@@ -37,7 +37,7 @@ Create a Rust CLI sample project that demonstrates core Taskwarrior library func
 ## Technical Context
 
 **Language/Version**: Rust 1.75+ (matching library requirements)
-**Primary Dependencies**: taskwarriorlib (local), clap (CLI), anyhow (error handling), tracing (logging)
+**Primary Dependencies**: taskwarrior3lib (local), clap (CLI), anyhow (error handling), tracing (logging)
 **Storage**: File-based storage via Taskwarrior library (XDG compliant)
 **Testing**: cargo test (unit + integration), manual testing for CLI workflows
 **Target Platform**: Cross-platform (macOS, Linux, Windows)

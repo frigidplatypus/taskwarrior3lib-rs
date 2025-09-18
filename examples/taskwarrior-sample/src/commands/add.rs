@@ -1,7 +1,7 @@
 use anyhow::Result;
-use taskwarriorlib::task::{TaskStatus as LibTaskStatus};
-use taskwarriorlib::task::manager::DefaultTaskManager;
-use taskwarriorlib::TaskManager;
+use taskwarrior3lib::task::{TaskStatus as LibTaskStatus};
+use taskwarrior3lib::task::manager::DefaultTaskManager;
+use taskwarrior3lib::TaskManager;
 use crate::models::{AddCommand, Task};
 
 /// Execute the add command
@@ -14,7 +14,7 @@ pub fn execute_add(
 
     // If additional fields are provided, update the task
     if cmd.project.is_some() || cmd.priority.is_some() || cmd.due.is_some() {
-        let mut update = taskwarriorlib::task::manager::TaskUpdate::new();
+        let mut update = taskwarrior3lib::task::manager::TaskUpdate::new();
 
         if let Some(project) = cmd.project {
             update = update.project(project);
@@ -22,9 +22,9 @@ pub fn execute_add(
 
         if let Some(priority_str) = cmd.priority {
             let priority = match priority_str.to_lowercase().as_str() {
-                "l" | "low" => taskwarriorlib::task::Priority::Low,
-                "m" | "medium" => taskwarriorlib::task::Priority::Medium,
-                "h" | "high" => taskwarriorlib::task::Priority::High,
+                "l" | "low" => taskwarrior3lib::task::Priority::Low,
+                "m" | "medium" => taskwarrior3lib::task::Priority::Medium,
+                "h" | "high" => taskwarrior3lib::task::Priority::High,
                 _ => return Err(anyhow::anyhow!("Invalid priority: {}", priority_str)),
             };
             update = update.priority(priority);
@@ -52,9 +52,9 @@ pub fn execute_add(
         modified: added_task.modified.unwrap_or(added_task.entry),
         project: added_task.project,
         priority: added_task.priority.map(|p| match p {
-            taskwarriorlib::task::Priority::Low => crate::models::TaskPriority::Low,
-            taskwarriorlib::task::Priority::Medium => crate::models::TaskPriority::Medium,
-            taskwarriorlib::task::Priority::High => crate::models::TaskPriority::High,
+            taskwarrior3lib::task::Priority::Low => crate::models::TaskPriority::Low,
+            taskwarrior3lib::task::Priority::Medium => crate::models::TaskPriority::Medium,
+            taskwarrior3lib::task::Priority::High => crate::models::TaskPriority::High,
         }),
         due: added_task.due,
     };

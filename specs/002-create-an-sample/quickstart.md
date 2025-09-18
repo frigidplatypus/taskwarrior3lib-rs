@@ -14,7 +14,7 @@ This sample project demonstrates how to use the Taskwarrior Rust library to buil
 ### 1. Create the Sample Project
 
 ```bash
-cd /path/to/taskwarriorlib-rs
+cd /path/to/taskwarrior3lib-rs
 mkdir examples/taskwarrior-sample
 cd examples/taskwarrior-sample
 cargo init --bin

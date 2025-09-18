@@ -173,7 +173,7 @@ enum Commands {
 
 ```toml
 [dependencies]
-taskwarriorlib = { path = "../.." }
+taskwarrior3lib = { path = "../.." }
 ```
 
 ### Testing Setup

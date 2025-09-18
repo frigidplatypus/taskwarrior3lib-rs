@@ -6,7 +6,7 @@
 ## Execution Flow (main)
 ```
 1. Load plan.md from feature directory
-   → Tech stack: Rust 1.75+, clap, anyhow, taskwarriorlib
+   → Tech stack: Rust 1.75+, clap, anyhow, taskwarrior3lib
    → Structure: examples/taskwarrior-sample/ with src/, tests/
 2. Load optional design documents:
    → data-model.md: Task entity, CLI commands, Configuration
@@ -43,7 +43,7 @@
 
 ## Phase 3.1: Setup
 - [ ] T001 Create project structure in examples/taskwarrior-sample/
-- [ ] T002 Initialize Cargo.toml with taskwarriorlib, clap, anyhow dependencies
+- [ ] T002 Initialize Cargo.toml with taskwarrior3lib, clap, anyhow dependencies
 - [ ] T003 Configure rustfmt and clippy linting
 
 ## Phase 3.2: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3

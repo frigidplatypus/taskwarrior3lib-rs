@@ -1,7 +1,7 @@
 use anyhow::Result;
 use uuid::Uuid;
-use taskwarriorlib::task::manager::{DefaultTaskManager, TaskUpdate};
-use taskwarriorlib::TaskManager;
+use taskwarrior3lib::task::manager::{DefaultTaskManager, TaskUpdate};
+use taskwarrior3lib::TaskManager;
 
 /// Execute the edit command
 pub fn execute_edit(
@@ -33,9 +33,9 @@ pub fn execute_edit(
     // Update priority if provided
     if let Some(priority_str) = cmd.priority {
         let priority = match priority_str.to_lowercase().as_str() {
-            "l" | "low" => taskwarriorlib::task::Priority::Low,
-            "m" | "medium" => taskwarriorlib::task::Priority::Medium,
-            "h" | "high" => taskwarriorlib::task::Priority::High,
+            "l" | "low" => taskwarrior3lib::task::Priority::Low,
+            "m" | "medium" => taskwarrior3lib::task::Priority::Medium,
+            "h" | "high" => taskwarrior3lib::task::Priority::High,
             _ => return Err(anyhow::anyhow!("Invalid priority: {}", priority_str)),
         };
         update = update.priority(priority);

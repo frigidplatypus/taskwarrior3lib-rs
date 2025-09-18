@@ -1,9 +1,9 @@
 use anyhow::Result;
 use std::path::PathBuf;
-use taskwarriorlib::config::Configuration;
-use taskwarriorlib::hooks::DefaultHookSystem;
-use taskwarriorlib::storage::TaskChampionStorageBackend;
-use taskwarriorlib::task::manager::DefaultTaskManager;
+use taskwarrior3lib::config::Configuration;
+use taskwarrior3lib::hooks::DefaultHookSystem;
+use taskwarrior3lib::storage::TaskChampionStorageBackend;
+use taskwarrior3lib::task::manager::DefaultTaskManager;
 
 /// Application configuration and setup
 pub struct App {

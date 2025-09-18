@@ -1,11 +1,11 @@
 [package]
-name = "taskwarriorlib"
+name = "taskwarrior3lib"
 version = "0.1.0"
 edition = "2021"
 authors = ["Your Name <you@example.com>"]
-description = "A Rust library for interacting with Taskwarrior"
+description = "A Rust library for interacting with Taskwarrior 3.x (TaskChampion backend)"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/taskwarriorlib-rs"
+repository = "https://github.com/yourusername/taskwarrior3lib-rs"
 keywords = ["taskwarrior", "productivity", "task-management", "cli-tools"]
 categories = ["command-line-utilities", "filesystem"]
 

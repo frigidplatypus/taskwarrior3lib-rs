@@ -1,7 +1,7 @@
-# GitHub Copilot Instructions for Rust Taskwarrior Library
+# GitHub Copilot Instructions for Taskwarrior 3 Rust Library
 
 ## Project Overview
-This is a Rust library that provides idiomatic access to Taskwarrior functionality. The library follows Rust conventions and integrates with the local Taskwarrior installation.
+This is a Rust library that provides idiomatic access to Taskwarrior 3.x functionality via TaskChampion backend integration. The library follows Rust conventions and integrates with local Taskwarrior installations.
 
 ## Core Principles
 - **Idiomatic Rust**: Use Result<T, E>, builder patterns, traits, and proper error handling

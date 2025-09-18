@@ -1,8 +1,8 @@
 use anyhow::Result;
 use uuid::Uuid;
-use taskwarriorlib::task::{TaskStatus as LibTaskStatus};
-use taskwarriorlib::task::manager::{DefaultTaskManager, TaskUpdate};
-use taskwarriorlib::TaskManager;
+use taskwarrior3lib::task::{TaskStatus as LibTaskStatus};
+use taskwarrior3lib::task::manager::{DefaultTaskManager, TaskUpdate};
+use taskwarrior3lib::TaskManager;
 
 /// Execute the done command
 pub fn execute_done(

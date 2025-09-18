@@ -3,7 +3,7 @@ use anyhow::Result;
 use taskwarrior_sample::app::App;
 use taskwarrior_sample::commands::{execute_add, execute_list, execute_done};
 use taskwarrior_sample::models::{AddCommand, ListCommand, DoneCommand, TaskStatus};
-use taskwarriorlib::TaskManager;
+use taskwarrior3lib::TaskManager;
 use std::process::Command;
 
 #[derive(Parser)]
