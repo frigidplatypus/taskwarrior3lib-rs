@@ -4,6 +4,9 @@
 //! and database storage options.
 
 pub mod serialization;
+pub mod taskchampion;
+
+pub use taskchampion::TaskChampionStorageBackend;
 
 use crate::error::{StorageError, TaskError};
 use crate::query::TaskQuery;

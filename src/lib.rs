@@ -6,6 +6,7 @@
 //! ## Features
 //!
 //! - **Task Management**: Complete CRUD operations for tasks
+//! - **TaskChampion Integration**: Direct access to Taskwarrior's SQLite database
 //! - **Query System**: Powerful filtering and searching capabilities
 //! - **Date Handling**: Comprehensive date parsing with synonyms and relative dates
 //! - **Configuration**: XDG-compliant configuration discovery
@@ -17,31 +18,26 @@
 //! ## Quick Start
 //!
 //! ```rust
-//! use taskwarriorlib::{ConfigurationBuilder, storage::FileStorageBackend, hooks::DefaultHookSystem, TaskStatus};
+//! use taskwarriorlib::{Configuration, TaskManager};
+//! use taskwarriorlib::storage::TaskChampionStorageBackend;
+//! use taskwarriorlib::hooks::DefaultHookSystem;
 //! use taskwarriorlib::task::manager::DefaultTaskManager;
-//! use taskwarriorlib::query::TaskQueryBuilder;
 //! use taskwarriorlib::query::TaskQueryBuilderImpl;
-//! use taskwarriorlib::TaskManager;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // Build configuration (defaults to XDG discovery)
-//! let config = ConfigurationBuilder::new().build()?;
-//! // Create a simple file storage backend (uses default path)
-//! let storage: Box<dyn taskwarriorlib::storage::StorageBackend> = Box::new(FileStorageBackend::new());
-//! // Create default hook system
-//! let hooks: Box<dyn taskwarriorlib::hooks::HookSystem> = Box::new(DefaultHookSystem::new());
-//! // Create the task manager
+//! // Connect to actual Taskwarrior database
+//! let config = Configuration::default();
+//! let storage = Box::new(TaskChampionStorageBackend::with_standard_path());
+//! let hooks = Box::new(DefaultHookSystem::new());
 //! let mut task_manager = DefaultTaskManager::new(config, storage, hooks)?;
 //!
-//! // Add a task
-//! let task = task_manager.add_task("Write documentation".to_string())?;
-//!
-//! // Query pending tasks
-//! // Use the TaskQueryBuilder trait to construct a query
+//! // Query tasks from your actual Taskwarrior installation
 //! let query = TaskQueryBuilderImpl::new()
 //!     .status(TaskStatus::Pending)
 //!     .build()?;
 //! let tasks = task_manager.query_tasks(&query)?;
+//! 
+//! println!("Found {} pending tasks", tasks.len());
 //! # Ok(())
 //! # }
 //! ```

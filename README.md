@@ -93,7 +93,7 @@ for task in tasks {
 if let Some(mut task) = task_manager.get_task(uuid::Uuid::parse_str("your-task-uuid").unwrap()) {
     // Update the description
     task.description = "Updated task description".to_string();
-    
+
     // Save the changes
     task_manager.update_task(task)
         .expect("Failed to update task");
