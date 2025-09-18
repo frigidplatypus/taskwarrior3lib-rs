@@ -2,6 +2,38 @@ name: CI
 
 on:
   push:
+    branches: [ main, master, '001-a-rust-library' ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Check formatting
+        run: |
+          cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: |
+          cargo clippy --all-targets -- -D warnings
+
+      - name: Run tests
+        run: |
+          cargo test --all --tests
+name: CI
+
+on:
+  push:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
