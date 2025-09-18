@@ -7,3 +7,62 @@ devenv.local.nix
 
 # pre-commit
 .pre-commit-config.yaml
+
+# ---------------------
+# Rust / Cargo defaults
+# ---------------------
+
+# Build output
+/target/
+
+# If you want to avoid checking in Cargo.lock (libraries should, binaries may)
+# Cargo.lock
+
+# Generated documentation
+/target/doc/
+
+# Incremental compilation (sometimes nested under target/)
+**/incremental/
+
+# Rustup / toolchains
+.rustup/
+
+# Cargo cache (if accidentally added)
+.cargo/
+
+# ---------------------
+# Editor / OS
+# ---------------------
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# JetBrains
+.idea/
+*.iml
+
+# Emacs, Vim, and other editor temp files
+*~
+*.swp
+*.swo
+*.tmp
+
+# Shell history / environment
+.env
+.env.*
+
+# Log files
+*.log
+
+# Temporary dirs
+tmp/
+
+# Devenv local folder (already partially ignored)
+.devenv/
+
+# GitHub Codespaces / devcontainer
+.devcontainer/
+
