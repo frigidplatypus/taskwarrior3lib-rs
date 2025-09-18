@@ -4,14 +4,13 @@
 //! for searching and retrieving tasks.
 
 use crate::task::TaskStatus;
-use filter::{DateFilter, TagFilter, ProjectFilter, SortCriteria};
+use filter::{DateFilter, ProjectFilter, SortCriteria, TagFilter};
 
 pub mod builder;
 pub mod filter;
 
 /// Task query specification
-#[derive(Debug, Clone, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct TaskQuery {
     pub status: Option<TaskStatus>,
     pub project_filter: Option<ProjectFilter>,
@@ -21,8 +20,6 @@ pub struct TaskQuery {
     pub limit: Option<usize>,
     pub offset: Option<usize>,
 }
-
-
 
 // Re-export main types
 pub use builder::{TaskQueryBuilder, TaskQueryBuilderImpl};

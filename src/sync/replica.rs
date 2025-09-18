@@ -3,8 +3,8 @@
 //! This module will handle task replica synchronization.
 //! Currently a placeholder for compilation.
 
-use crate::task::Task;
 use crate::error::SyncError;
+use crate::task::Task;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -45,12 +45,12 @@ impl ReplicaManager {
             },
         })
     }
-    
+
     pub fn apply_operation(&mut self, _operation: Operation) -> Result<(), SyncError> {
         // TODO: Implement actual operation application
         Ok(())
     }
-    
+
     pub fn sync_with(&mut self, _other: &mut ReplicaState) -> Result<Vec<Operation>, SyncError> {
         // TODO: Implement actual synchronization logic
         Ok(vec![])

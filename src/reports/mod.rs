@@ -5,13 +5,13 @@
 
 pub mod builtin;
 
+use crate::error::TaskError;
+use crate::query::TaskQuery;
+use crate::task::Task;
+use builtin::{BuiltinReports, ReportConfig, ReportFormat, ReportResult, ReportType};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Write;
-use crate::error::TaskError;
-use crate::task::Task;
-use crate::query::TaskQuery;
-use builtin::{ReportResult, ReportFormat, ReportConfig, ReportType, BuiltinReports};
-use serde::{Deserialize, Serialize};
 
 /// Legacy report definition for compatibility
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -31,12 +31,8 @@ pub struct Report {
 /// Report generator trait
 pub trait ReportGenerator {
     /// Generate a report from tasks
-    fn generate(
-        &self,
-        tasks: &[Task],
-        config: &ReportConfig,
-    ) -> Result<ReportResult, TaskError>;
-    
+    fn generate(&self, tasks: &[Task], config: &ReportConfig) -> Result<ReportResult, TaskError>;
+
     /// Format report result for output
     fn format_output<W: Write>(
         &self,
@@ -44,7 +40,7 @@ pub trait ReportGenerator {
         format: ReportFormat,
         writer: &mut W,
     ) -> Result<(), TaskError>;
-    
+
     /// Get available report types
     fn available_reports(&self) -> Vec<ReportType>;
 }
@@ -52,11 +48,15 @@ pub trait ReportGenerator {
 /// Legacy trait for report execution (compatibility)
 pub trait ReportRunner {
     /// Execute a report
-    fn run_report(&self, report: &Report, query: Option<&TaskQuery>) -> Result<Vec<Task>, TaskError>;
-    
+    fn run_report(
+        &self,
+        report: &Report,
+        query: Option<&TaskQuery>,
+    ) -> Result<Vec<Task>, TaskError>;
+
     /// Get available reports
     fn get_reports(&self) -> Result<Vec<Report>, TaskError>;
-    
+
     /// Get a specific report by name
     fn get_report(&self, name: &str) -> Result<Option<Report>, TaskError>;
 }
@@ -76,17 +76,17 @@ impl ReportManager {
             custom_reports: HashMap::new(),
         }
     }
-    
+
     /// Add custom report configuration
     pub fn add_custom_report<S: Into<String>>(&mut self, name: S, config: ReportConfig) {
         self.custom_reports.insert(name.into(), config);
     }
-    
+
     /// Get custom report configuration
     pub fn get_custom_report(&self, name: &str) -> Option<&ReportConfig> {
         self.custom_reports.get(name)
     }
-    
+
     /// Generate report by name
     pub fn generate_named_report(
         &self,
@@ -107,7 +107,7 @@ impl ReportManager {
             "burndown" => Some(ReportType::Burndown),
             _ => None,
         };
-        
+
         if let Some(report_type) = report_type {
             let config = builtin::default_config_for_report(report_type);
             self.builtin_reports.generate_report(tasks, &config)
@@ -119,7 +119,7 @@ impl ReportManager {
             })
         }
     }
-    
+
     /// Format and output report
     pub fn output_report<W: Write>(
         &self,
@@ -134,7 +134,7 @@ impl ReportManager {
             ReportFormat::Simple => self.format_simple(result, writer),
         }
     }
-    
+
     /// Format report as table
     fn format_table<W: Write>(
         &self,
@@ -143,12 +143,12 @@ impl ReportManager {
     ) -> Result<(), TaskError> {
         // Calculate column widths
         let mut col_widths = HashMap::new();
-        
+
         // Check header widths
         for header in &result.headers {
             col_widths.insert(header.clone(), header.len());
         }
-        
+
         // Check data widths
         for row in &result.rows {
             for (key, value) in &row.values {
@@ -156,7 +156,7 @@ impl ReportManager {
                 col_widths.insert(key.clone(), (*current_width).max(value.len()));
             }
         }
-        
+
         // Write header
         for (i, header) in result.headers.iter().enumerate() {
             if i > 0 {
@@ -166,7 +166,7 @@ impl ReportManager {
             write!(writer, "{header:<width$}")?;
         }
         writeln!(writer)?;
-        
+
         // Write separator
         for (i, header) in result.headers.iter().enumerate() {
             if i > 0 {
@@ -176,7 +176,7 @@ impl ReportManager {
             write!(writer, "{}", "-".repeat(width))?;
         }
         writeln!(writer)?;
-        
+
         // Write data rows
         for row in &result.rows {
             for (i, header) in result.headers.iter().enumerate() {
@@ -189,7 +189,7 @@ impl ReportManager {
             }
             writeln!(writer)?;
         }
-        
+
         // Write summary if present
         if !result.summary.is_empty() {
             writeln!(writer)?;
@@ -198,29 +198,24 @@ impl ReportManager {
                 writeln!(writer, "{key}: {value}")?;
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Format report as JSON
     fn format_json<W: Write>(
         &self,
         result: &ReportResult,
         writer: &mut W,
     ) -> Result<(), TaskError> {
-        serde_json::to_writer_pretty(writer, result)
-            .map_err(TaskError::Serialization)
+        serde_json::to_writer_pretty(writer, result).map_err(TaskError::Serialization)
     }
-    
+
     /// Format report as CSV
-    fn format_csv<W: Write>(
-        &self,
-        result: &ReportResult,
-        writer: &mut W,
-    ) -> Result<(), TaskError> {
+    fn format_csv<W: Write>(&self, result: &ReportResult, writer: &mut W) -> Result<(), TaskError> {
         // Write header
         writeln!(writer, "{}", result.headers.join(","))?;
-        
+
         // Write data rows
         for row in &result.rows {
             let mut values = Vec::new();
@@ -235,10 +230,10 @@ impl ReportManager {
             }
             writeln!(writer, "{}", values.join(","))?;
         }
-        
+
         Ok(())
     }
-    
+
     /// Format report in simple format (one line per row)
     fn format_simple<W: Write>(
         &self,
@@ -256,17 +251,17 @@ impl ReportManager {
             }
             writeln!(writer, "{}", parts.join(", "))?;
         }
-        
+
         if !result.summary.is_empty() {
             writeln!(writer)?;
             for (key, value) in &result.summary {
                 writeln!(writer, "{key}: {value}")?;
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// List all available reports
     pub fn list_reports(&self) -> Vec<String> {
         let mut reports = vec![
@@ -281,7 +276,7 @@ impl ReportManager {
             "tags".to_string(),
             "burndown".to_string(),
         ];
-        
+
         // Add custom reports
         reports.extend(self.custom_reports.keys().cloned());
         reports.sort();
@@ -296,14 +291,10 @@ impl Default for ReportManager {
 }
 
 impl ReportGenerator for ReportManager {
-    fn generate(
-        &self,
-        tasks: &[Task],
-        config: &ReportConfig,
-    ) -> Result<ReportResult, TaskError> {
+    fn generate(&self, tasks: &[Task], config: &ReportConfig) -> Result<ReportResult, TaskError> {
         self.builtin_reports.generate_report(tasks, config)
     }
-    
+
     fn format_output<W: Write>(
         &self,
         result: &ReportResult,
@@ -312,7 +303,7 @@ impl ReportGenerator for ReportManager {
     ) -> Result<(), TaskError> {
         self.output_report(result, format, writer)
     }
-    
+
     fn available_reports(&self) -> Vec<ReportType> {
         vec![
             ReportType::List,
@@ -337,12 +328,12 @@ pub fn generate_report_string(
 ) -> Result<String, TaskError> {
     let manager = ReportManager::new();
     let result = manager.generate_named_report(tasks, report_name)?;
-    
+
     let mut output = Vec::new();
     manager.output_report(&result, format, &mut output)?;
-    
+
     String::from_utf8(output).map_err(|e| TaskError::InvalidData {
-    message: format!("Invalid UTF-8 in report output: {e}"),
+        message: format!("Invalid UTF-8 in report output: {e}"),
     })
 }
 
@@ -370,60 +361,64 @@ mod tests {
         assert!(reports.contains(&"next".to_string()));
         assert!(reports.contains(&"summary".to_string()));
     }
-    
+
     #[test]
     fn test_generate_named_report() {
         let mut tasks = Vec::new();
         let mut task = Task::new("Test task".to_string());
         task.status = TaskStatus::Pending;
         tasks.push(task);
-        
+
         let manager = ReportManager::new();
         let result = manager.generate_named_report(&tasks, "list").unwrap();
-        
+
         assert_eq!(result.shown_count, 1);
         assert!(!result.headers.is_empty());
         assert!(!result.rows.is_empty());
     }
-    
+
     #[test]
     fn test_table_formatting() {
         let mut tasks = Vec::new();
         let task = Task::new("Test task".to_string());
         tasks.push(task);
-        
+
         let manager = ReportManager::new();
         let result = manager.generate_named_report(&tasks, "list").unwrap();
-        
+
         let mut output = Vec::new();
-        manager.output_report(&result, ReportFormat::Table, &mut output).unwrap();
-        
+        manager
+            .output_report(&result, ReportFormat::Table, &mut output)
+            .unwrap();
+
         let output_str = String::from_utf8(output).unwrap();
         assert!(output_str.contains("Test task"));
-        assert!(output_str.contains("|"));  // Table separator
-        assert!(output_str.contains("-"));  // Table border
+        assert!(output_str.contains("|")); // Table separator
+        assert!(output_str.contains("-")); // Table border
     }
-    
+
     #[test]
     fn test_json_formatting() {
         let tasks = vec![Task::new("Test task".to_string())];
-        
+
         let manager = ReportManager::new();
         let result = manager.generate_named_report(&tasks, "list").unwrap();
-        
+
         let mut output = Vec::new();
-        manager.output_report(&result, ReportFormat::Json, &mut output).unwrap();
-        
+        manager
+            .output_report(&result, ReportFormat::Json, &mut output)
+            .unwrap();
+
         let output_str = String::from_utf8(output).unwrap();
         assert!(output_str.starts_with('{'));
         assert!(output_str.contains("headers"));
         assert!(output_str.contains("rows"));
     }
-    
+
     #[test]
     fn test_helper_functions() {
         let tasks = vec![Task::new("Test task".to_string())];
-        
+
         let output = generate_report_string(&tasks, "list", ReportFormat::Table).unwrap();
         assert!(output.contains("Test task"));
     }

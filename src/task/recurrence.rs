@@ -22,7 +22,7 @@ impl RecurrencePattern {
             periodic: false,
         }
     }
-    
+
     /// Create a periodic recurrence pattern
     pub fn periodic(pattern: String) -> Self {
         Self {
@@ -30,20 +30,20 @@ impl RecurrencePattern {
             periodic: true,
         }
     }
-    
+
     /// Parse a recurrence string into a pattern
     pub fn parse(recur_str: &str) -> Result<Self, RecurrenceError> {
         if recur_str.is_empty() {
             return Err(RecurrenceError::Empty);
         }
-        
+
         // Check for periodic indicator using strip_prefix
         let (pattern, periodic) = if let Some(stripped) = recur_str.strip_prefix('P') {
             (stripped.to_string(), true)
         } else {
             (recur_str.to_string(), false)
         };
-        
+
         // Validate pattern
         if Self::is_valid_pattern(&pattern) {
             Ok(Self { pattern, periodic })
@@ -51,18 +51,20 @@ impl RecurrencePattern {
             Err(RecurrenceError::InvalidPattern(pattern))
         }
     }
-    
+
     /// Check if a pattern string is valid
     fn is_valid_pattern(pattern: &str) -> bool {
         // Common recurrence patterns
-        matches!(pattern, 
-            "daily" | "weekly" | "monthly" | "quarterly" | "yearly" |
-            "weekdays" | "weekends"
-        ) || pattern.ends_with("d") || pattern.ends_with("w") || 
-            pattern.ends_with("m") || pattern.ends_with("q") || 
-            pattern.ends_with("y")
+        matches!(
+            pattern,
+            "daily" | "weekly" | "monthly" | "quarterly" | "yearly" | "weekdays" | "weekends"
+        ) || pattern.ends_with("d")
+            || pattern.ends_with("w")
+            || pattern.ends_with("m")
+            || pattern.ends_with("q")
+            || pattern.ends_with("y")
     }
-    
+
     /// Get the base unit of recurrence
     pub fn get_unit(&self) -> RecurrenceUnit {
         // Match specific common patterns first
@@ -74,15 +76,15 @@ impl RecurrencePattern {
             "yearly" | "annually" => RecurrenceUnit::Year,
             _ => {
                 // Check word-based patterns
-                    if self.pattern.contains("day") {
+                if self.pattern.contains("day") {
                     RecurrenceUnit::Day
-                    } else if self.pattern.contains("week") {
+                } else if self.pattern.contains("week") {
                     RecurrenceUnit::Week
-                    } else if self.pattern.contains("month") {
+                } else if self.pattern.contains("month") {
                     RecurrenceUnit::Month
-                    } else if self.pattern.contains("quarter") {
+                } else if self.pattern.contains("quarter") {
                     RecurrenceUnit::Quarter
-                    } else if self.pattern.contains("year") {
+                } else if self.pattern.contains("year") {
                     RecurrenceUnit::Year
                 // Then check suffix-based patterns
                 } else if self.pattern.ends_with("d") {
@@ -155,7 +157,7 @@ mod tests {
         let pattern = RecurrencePattern::parse("daily").unwrap();
         assert_eq!(pattern.pattern, "daily");
         assert!(!pattern.periodic);
-        
+
         let periodic_pattern = RecurrencePattern::parse("Pweekly").unwrap();
         assert_eq!(periodic_pattern.pattern, "weekly");
         assert!(periodic_pattern.periodic);
@@ -172,10 +174,10 @@ mod tests {
     fn test_get_unit() {
         let daily = RecurrencePattern::new("daily".to_string());
         assert_eq!(daily.get_unit(), RecurrenceUnit::Day);
-        
+
         let weekly = RecurrencePattern::new("weekly".to_string());
         assert_eq!(weekly.get_unit(), RecurrenceUnit::Week);
-        
+
         let monthly = RecurrencePattern::new("3m".to_string());
         assert_eq!(monthly.get_unit(), RecurrenceUnit::Month);
     }
@@ -183,9 +185,9 @@ mod tests {
     #[test]
     fn test_display() {
         let normal = RecurrencePattern::new("daily".to_string());
-    assert_eq!(format!("{normal}"), "daily");
-        
+        assert_eq!(format!("{normal}"), "daily");
+
         let periodic = RecurrencePattern::periodic("weekly".to_string());
-    assert_eq!(format!("{periodic}"), "Pweekly");
+        assert_eq!(format!("{periodic}"), "Pweekly");
     }
 }

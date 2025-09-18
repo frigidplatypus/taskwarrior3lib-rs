@@ -62,10 +62,10 @@
 //! providing seamless hook execution during task operations.
 
 use crate::error::TaskError;
-use crate::hooks::events::{HookEvent, HookContext};
 use crate::hooks::config::HookConfig;
-use crate::hooks::HookConfigCollection;
+use crate::hooks::events::{HookContext, HookEvent};
 use crate::hooks::executor::HookExecutor;
+use crate::hooks::HookConfigCollection;
 use std::path::PathBuf;
 
 /// Hook execution result
@@ -86,12 +86,12 @@ impl HookResult {
     pub fn is_success(&self) -> bool {
         matches!(self, HookResult::Success | HookResult::Warning(_))
     }
-    
+
     /// Check if the hook result should abort the operation
     pub fn should_abort(&self) -> bool {
         matches!(self, HookResult::Abort(_))
     }
-    
+
     /// Get the error or warning message if any
     pub fn message(&self) -> Option<&str> {
         match self {
@@ -105,16 +105,16 @@ impl HookResult {
 pub trait HookManager: Send + Sync {
     /// Execute hooks for the given event and context
     fn execute_hooks(&self, context: &HookContext) -> Result<Vec<HookResult>, TaskError>;
-    
+
     /// Register a new hook
     fn register_hook(&mut self, config: HookConfig) -> Result<(), TaskError>;
-    
+
     /// Remove a hook by script path
     fn remove_hook<P: AsRef<std::path::Path>>(&mut self, script: P) -> Result<(), TaskError>;
-    
+
     /// List all registered hooks
     fn list_hooks(&self) -> Vec<&HookConfig>;
-    
+
     /// Check if any hooks are registered for the given event
     fn has_hooks_for_event(&self, event: &HookEvent) -> bool;
 }
@@ -142,7 +142,7 @@ impl DefaultHookManager {
             executor: HookExecutor::new(),
         }
     }
-    
+
     /// Create a new hook manager with custom executor
     pub fn with_executor(executor: HookExecutor) -> Self {
         Self {
@@ -150,14 +150,17 @@ impl DefaultHookManager {
             executor,
         }
     }
-    
+
     /// Get number of registered hooks
     pub fn hook_count(&self) -> usize {
         self.hooks.len()
     }
-    
+
     /// Load hooks from configuration directory
-    pub fn load_from_config_dir<P: AsRef<std::path::Path>>(&mut self, config_dir: P) -> Result<(), TaskError> {
+    pub fn load_from_config_dir<P: AsRef<std::path::Path>>(
+        &mut self,
+        config_dir: P,
+    ) -> Result<(), TaskError> {
         let hooks_dir = config_dir.as_ref().join("hooks");
         if !hooks_dir.exists() {
             return Ok(());
@@ -168,7 +171,10 @@ impl DefaultHookManager {
     }
 
     /// Load hooks from a configuration collection
-    pub fn load_from_collection(&mut self, collection: HookConfigCollection) -> Result<(), TaskError> {
+    pub fn load_from_collection(
+        &mut self,
+        collection: HookConfigCollection,
+    ) -> Result<(), TaskError> {
         // Clear existing hooks
         self.hooks.clear();
 
@@ -179,7 +185,8 @@ impl DefaultHookManager {
 
         // Update executor with global settings
         if let Some(timeout) = collection.global_timeout {
-            self.executor = HookExecutor::new().with_default_timeout(std::time::Duration::from_secs(timeout));
+            self.executor =
+                HookExecutor::new().with_default_timeout(std::time::Duration::from_secs(timeout));
         }
 
         // Add global environment variables
@@ -199,14 +206,15 @@ impl DefaultHookManager {
         let collection = HookConfigCollection::discover_from_standard_locations(&task_data_dir)?;
         self.load_from_collection(collection)
     }
-    
+
     /// Get hooks for a specific event, sorted by priority
     fn get_hooks_for_event(&self, event: &HookEvent) -> Vec<&HookConfig> {
-        let mut hooks: Vec<&HookConfig> = self.hooks
+        let mut hooks: Vec<&HookConfig> = self
+            .hooks
             .iter()
             .filter(|hook| hook.should_execute(event))
             .collect();
-        
+
         // Sort by priority (lower numbers first)
         hooks.sort_by(|a, b| a.priority.cmp(&b.priority));
         hooks
@@ -217,15 +225,15 @@ impl HookManager for DefaultHookManager {
     fn execute_hooks(&self, context: &HookContext) -> Result<Vec<HookResult>, TaskError> {
         let hooks = self.get_hooks_for_event(&context.event);
         let mut results = Vec::new();
-        
+
         for hook in hooks {
             let result = self.executor.execute_hook(hook, context)?;
             results.push(result);
         }
-        
+
         Ok(results)
     }
-    
+
     fn register_hook(&mut self, config: HookConfig) -> Result<(), TaskError> {
         // Check if hook script exists
         if !config.path.exists() {
@@ -233,33 +241,33 @@ impl HookManager for DefaultHookManager {
                 message: format!("Hook script does not exist: {}", config.path.display()),
             });
         }
-        
+
         // Remove existing hook with the same script path
         self.hooks.retain(|h| h.path != config.path);
-        
+
         // Add the new hook
         self.hooks.push(config);
         Ok(())
     }
-    
+
     fn remove_hook<P: AsRef<std::path::Path>>(&mut self, script: P) -> Result<(), TaskError> {
         let script_path = script.as_ref();
         let initial_len = self.hooks.len();
         self.hooks.retain(|h| h.path != script_path);
-        
+
         if self.hooks.len() == initial_len {
             return Err(TaskError::InvalidData {
                 message: format!("Hook not found: {}", script_path.display()),
             });
         }
-        
+
         Ok(())
     }
-    
+
     fn list_hooks(&self) -> Vec<&HookConfig> {
         self.hooks.iter().collect()
     }
-    
+
     fn has_hooks_for_event(&self, event: &HookEvent) -> bool {
         self.hooks.iter().any(|hook| hook.should_execute(event))
     }
@@ -277,45 +285,45 @@ mod tests {
         let warning = HookResult::Warning("warning".to_string());
         let error = HookResult::Error("error".to_string());
         let abort = HookResult::Abort("abort".to_string());
-        
+
         assert!(success.is_success());
         assert!(warning.is_success());
         assert!(!error.is_success());
         assert!(!abort.is_success());
-        
+
         assert!(!success.should_abort());
         assert!(!warning.should_abort());
         assert!(!error.should_abort());
         assert!(abort.should_abort());
-        
+
         assert_eq!(warning.message(), Some("warning"));
         assert_eq!(success.message(), None);
     }
-    
+
     #[test]
     fn test_hook_manager() {
         let mut manager = DefaultHookManager::new();
-        
+
         let temp_dir = TempDir::new().unwrap();
         let script_path = temp_dir.path().join("test_hook.sh");
         std::fs::write(&script_path, "#!/bin/bash\necho 'test'").unwrap();
-        
+
         let config = HookConfig::new(&script_path, vec![HookEvent::PreAdd]);
-        
+
         assert!(manager.register_hook(config).is_ok());
         assert!(manager.has_hooks_for_event(&HookEvent::PreAdd));
         assert!(!manager.has_hooks_for_event(&HookEvent::PreModify));
         assert_eq!(manager.list_hooks().len(), 1);
-        
+
         assert!(manager.remove_hook(&script_path).is_ok());
         assert_eq!(manager.list_hooks().len(), 0);
     }
-    
+
     #[test]
     fn test_hook_execution() {
         let manager = DefaultHookManager::new();
         let context = HookContext::new(HookEvent::PreAdd);
-        
+
         let results = manager.execute_hooks(&context).unwrap();
         assert_eq!(results.len(), 0); // No hooks registered
     }

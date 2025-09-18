@@ -69,13 +69,13 @@
 //! - Timeouts must be positive values
 //! - Environment variables must be valid strings
 
-use crate::hooks::events::HookEvent;
 use crate::error::TaskError;
-use serde::{Serialize, Deserialize};
-use std::path::{PathBuf, Path};
+use crate::hooks::events::HookEvent;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 #[allow(unused_imports)]
 use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Hook execution configuration
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -103,31 +103,31 @@ impl HookConfig {
     pub fn should_execute(&self, event: &HookEvent) -> bool {
         self.enabled && self.events.contains(event)
     }
-    
+
     /// Set working directory
     pub fn with_working_dir<P: Into<PathBuf>>(mut self, dir: P) -> Self {
         self.working_directory = Some(dir.into());
         self
     }
-    
+
     /// Set timeout
     pub fn with_timeout(mut self, timeout: u64) -> Self {
         self.timeout = Some(timeout);
         self
     }
-    
+
     /// Set priority
     pub fn with_priority(mut self, priority: i32) -> Self {
         self.priority = priority;
         self
     }
-    
+
     /// Add environment variable
     pub fn with_env<K: Into<String>, V: Into<String>>(mut self, key: K, value: V) -> Self {
         self.environment.insert(key.into(), value.into());
         self
     }
-    
+
     /// Enable/disable hook
     pub fn with_enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
@@ -171,7 +171,9 @@ impl HookConfig {
     /// Convert this configuration to a Hook instance
     pub fn to_hook(&self) -> Hook {
         Hook {
-            name: self.path.file_name()
+            name: self
+                .path
+                .file_name()
                 .and_then(|s| s.to_str())
                 .unwrap_or("unknown")
                 .to_string(),
@@ -195,8 +197,8 @@ impl HookConfig {
             {
                 return captures[1].parse().unwrap_or(50);
             }
-            
-            // Look for numeric suffix (e.g., "hook-01.sh") 
+
+            // Look for numeric suffix (e.g., "hook-01.sh")
             if let Some(captures) = regex::Regex::new(r"[-_](\d+)$")
                 .ok()
                 .and_then(|re| re.captures(filename))
@@ -204,7 +206,7 @@ impl HookConfig {
                 return captures[1].parse().unwrap_or(50);
             }
         }
-        
+
         // Default priority
         50
     }
@@ -256,35 +258,39 @@ impl HookConfigCollection {
     /// Load hook configuration from a directory
     pub fn load_from_dir(dir_path: &Path) -> Result<Self, TaskError> {
         let mut collection = Self::new();
-        
+
         // First try to load existing configuration file
         let config_file = dir_path.join("hooks.toml");
         if config_file.exists() {
             collection = Self::load_from_file(&config_file)?;
         }
-        
+
         // Scan for hook scripts and merge with existing configuration
         let discovered_hooks = Self::discover_hook_scripts(dir_path)?;
-        
+
         // Merge discovered hooks with existing configuration
         for discovered in discovered_hooks {
             // Check if we already have configuration for this hook
-            if !collection.hooks.iter().any(|existing| existing.path == discovered.path) {
+            if !collection
+                .hooks
+                .iter()
+                .any(|existing| existing.path == discovered.path)
+            {
                 collection.hooks.push(discovered);
             }
         }
-        
+
         Ok(collection)
     }
 
     /// Discover hook scripts in a directory
     fn discover_hook_scripts(dir_path: &Path) -> Result<Vec<HookConfig>, TaskError> {
         let mut hooks = Vec::new();
-        
+
         if !dir_path.exists() {
             return Ok(hooks);
         }
-        
+
         // Scan the directory for hook scripts
         for script_path in Self::scan_hook_directory(dir_path)? {
             if HookConfig::is_executable(&script_path) {
@@ -293,38 +299,42 @@ impl HookConfigCollection {
                 hooks.push(config);
             }
         }
-        
+
         Ok(hooks)
     }
 
     /// Scan directory for potential hook scripts
     fn scan_hook_directory(dir_path: &Path) -> Result<Vec<PathBuf>, TaskError> {
         let mut scripts = Vec::new();
-        
-        let entries = std::fs::read_dir(dir_path)
-            .map_err(|e| TaskError::Hook {
-                message: format!("Failed to read hook directory {}: {}", dir_path.display(), e),
-            })?;
-        
+
+        let entries = std::fs::read_dir(dir_path).map_err(|e| TaskError::Hook {
+            message: format!(
+                "Failed to read hook directory {}: {}",
+                dir_path.display(),
+                e
+            ),
+        })?;
+
         for entry in entries {
             let entry = entry.map_err(|e| TaskError::Hook {
                 message: format!("Failed to read directory entry: {e}"),
             })?;
-            
+
             let path = entry.path();
-            
+
             if path.is_file() {
                 // Check if it's a script or binary (skip config files)
                 if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
                     // Skip configuration and documentation files
-                    if filename.ends_with(".toml") || 
-                       filename.ends_with(".json") ||
-                       filename.ends_with(".md") ||
-                       filename.ends_with(".txt") {
+                    if filename.ends_with(".toml")
+                        || filename.ends_with(".json")
+                        || filename.ends_with(".md")
+                        || filename.ends_with(".txt")
+                    {
                         continue;
                     }
                 }
-                
+
                 scripts.push(path);
             } else if path.is_dir() {
                 // Recursively scan subdirectories
@@ -332,17 +342,17 @@ impl HookConfigCollection {
                 scripts.append(&mut sub_scripts);
             }
         }
-        
+
         Ok(scripts)
     }
 
     /// Infer hook events from script path/name
     fn infer_events_from_path(path: &Path) -> Vec<HookEvent> {
         let mut events = Vec::new();
-        
+
         if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
             let filename_lower = filename.to_lowercase();
-            
+
             // Check for event patterns in filename - match full patterns first
             if filename_lower.contains("on-add") {
                 events.push(HookEvent::OnAdd);
@@ -375,11 +385,12 @@ impl HookConfigCollection {
                 events.push(HookEvent::PostDelete);
             }
         }
-        
+
         // Check parent directory name for event patterns
-        if let Some(parent_name) = path.parent()
+        if let Some(parent_name) = path
+            .parent()
             .and_then(|p| p.file_name())
-            .and_then(|s| s.to_str()) 
+            .and_then(|s| s.to_str())
         {
             let parent_lower = parent_name.to_lowercase();
             if parent_lower == "on-add" {
@@ -404,58 +415,62 @@ impl HookConfigCollection {
                 events.push(HookEvent::PostDelete);
             }
         }
-        
+
         // If no events inferred, default to common events
         if events.is_empty() {
             events.push(HookEvent::PreAdd);
             events.push(HookEvent::PostAdd);
         }
-        
+
         events
     }
 
     /// Save configuration to a TOML file
     pub fn save_to_file(&self, path: &Path) -> Result<(), TaskError> {
-        let toml_content = toml::to_string_pretty(self)
-            .map_err(|e| TaskError::Hook {
-                message: format!("Failed to serialize hook configuration: {e}"),
-            })?;
-        
-        std::fs::write(path, toml_content)
-            .map_err(|e| TaskError::Hook {
-                message: format!("Failed to write hook configuration to {}: {}", path.display(), e),
-            })?;
-        
+        let toml_content = toml::to_string_pretty(self).map_err(|e| TaskError::Hook {
+            message: format!("Failed to serialize hook configuration: {e}"),
+        })?;
+
+        std::fs::write(path, toml_content).map_err(|e| TaskError::Hook {
+            message: format!(
+                "Failed to write hook configuration to {}: {}",
+                path.display(),
+                e
+            ),
+        })?;
+
         Ok(())
     }
 
     /// Load configuration from a TOML file
     pub fn load_from_file(path: &Path) -> Result<Self, TaskError> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| TaskError::Hook {
-                message: format!("Failed to read hook configuration from {}: {}", path.display(), e),
-            })?;
-        
-        toml::from_str(&content)
-            .map_err(|e| TaskError::Hook {
-                message: format!("Failed to parse hook configuration: {e}"),
-            })
+        let content = std::fs::read_to_string(path).map_err(|e| TaskError::Hook {
+            message: format!(
+                "Failed to read hook configuration from {}: {}",
+                path.display(),
+                e
+            ),
+        })?;
+
+        toml::from_str(&content).map_err(|e| TaskError::Hook {
+            message: format!("Failed to parse hook configuration: {e}"),
+        })
     }
 
     /// Discover hooks from standard locations with precedence
     pub fn discover_from_standard_locations(task_data_dir: &Path) -> Result<Self, TaskError> {
         let mut collection = Self::new();
-        
+
         // Define standard hook locations in precedence order
         let hook_locations = [
-            task_data_dir.join("hooks"),  // Project-specific hooks (highest precedence)
+            task_data_dir.join("hooks"), // Project-specific hooks (highest precedence)
             dirs::config_dir()
                 .unwrap_or_else(|| PathBuf::from("~/.config"))
                 .join("taskwarrior")
-                .join("hooks"),              // User hooks
+                .join("hooks"), // User hooks
             PathBuf::from("/etc/taskwarrior/hooks"), // System hooks (lowest precedence)
         ];
-        
+
         // Load hooks from each location in reverse precedence order
         // (later hooks override earlier ones)
         for location in hook_locations.iter().rev() {
@@ -464,7 +479,7 @@ impl HookConfigCollection {
                 collection = Self::merge_collections(collection, location_collection);
             }
         }
-        
+
         Ok(collection)
     }
 
@@ -474,11 +489,11 @@ impl HookConfigCollection {
         for (key, value) in override_collection.global_env {
             base.global_env.insert(key, value);
         }
-        
+
         if override_collection.global_timeout.is_some() {
             base.global_timeout = override_collection.global_timeout;
         }
-        
+
         // For hooks, replace any existing hooks with same path
         for new_hook in override_collection.hooks {
             // Remove any existing hook with same path
@@ -486,7 +501,7 @@ impl HookConfigCollection {
             // Add the new hook
             base.hooks.push(new_hook);
         }
-        
+
         base
     }
 
@@ -500,8 +515,8 @@ impl HookConfigCollection {
             {
                 return captures[1].parse().unwrap_or(50);
             }
-            
-            // Look for numeric suffix (e.g., "hook-01.sh") 
+
+            // Look for numeric suffix (e.g., "hook-01.sh")
             if let Some(captures) = regex::Regex::new(r"[-_](\d+)$")
                 .ok()
                 .and_then(|re| re.captures(filename))
@@ -509,7 +524,7 @@ impl HookConfigCollection {
                 return captures[1].parse().unwrap_or(50);
             }
         }
-        
+
         // Default priority
         50
     }
@@ -528,7 +543,9 @@ impl HookConfigCollection {
                 let mut hook = config.to_hook();
                 // Apply global environment variables
                 for (key, value) in &self.global_env {
-                    hook.environment.entry(key.clone()).or_insert_with(|| value.clone());
+                    hook.environment
+                        .entry(key.clone())
+                        .or_insert_with(|| value.clone());
                 }
                 // Apply global timeout if hook doesn't have one
                 if hook.timeout.is_none() {
@@ -543,17 +560,17 @@ impl HookConfigCollection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn test_hook_config_creation() {
         let temp_dir = TempDir::new().unwrap();
         let script_path = temp_dir.path().join("test_hook.sh");
         fs::write(&script_path, "#!/bin/bash\necho 'test'").unwrap();
-        
+
         let config = HookConfig::new(&script_path, vec![HookEvent::PreAdd]);
-        
+
         assert_eq!(config.path, script_path);
         assert_eq!(config.events, vec![HookEvent::PreAdd]);
         assert_eq!(config.priority, 50); // Default priority
@@ -563,19 +580,19 @@ mod tests {
     #[test]
     fn test_priority_calculation() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Test numeric prefix
         let script1 = temp_dir.path().join("05-high-priority.sh");
         fs::write(&script1, "#!/bin/bash\necho 'test'").unwrap();
         let priority1 = HookConfig::calculate_priority(&script1);
         assert_eq!(priority1, 5);
-        
+
         // Test numeric suffix
         let script2 = temp_dir.path().join("my-hook-10.py");
         fs::write(&script2, "#!/usr/bin/env python3\nprint('test')").unwrap();
         let priority2 = HookConfig::calculate_priority(&script2);
         assert_eq!(priority2, 10);
-        
+
         // Test no numeric pattern
         let script3 = temp_dir.path().join("regular-hook.sh");
         fs::write(&script3, "#!/bin/bash\necho 'test'").unwrap();
@@ -586,12 +603,12 @@ mod tests {
     #[test]
     fn test_event_inference() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Test filename-based inference
         let script1 = temp_dir.path().join("on-add-backup.sh");
         let events1 = HookConfigCollection::infer_events_from_path(&script1);
         assert!(events1.contains(&HookEvent::OnAdd));
-        
+
         // Test directory-based inference
         let hook_dir = temp_dir.path().join("pre-modify");
         fs::create_dir_all(&hook_dir).unwrap();
@@ -603,20 +620,20 @@ mod tests {
     #[test]
     fn test_hook_discovery() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Create various hook scripts
         let scripts = vec![
             ("on-add", "backup.sh"),
-            ("on-modify", "validate.py"), 
+            ("on-modify", "validate.py"),
             ("pre-delete", "confirm.sh"),
         ];
-        
+
         for (event_dir, script_name) in scripts {
             let dir = temp_dir.path().join(event_dir);
             fs::create_dir_all(&dir).unwrap();
             let script_path = dir.join(script_name);
             fs::write(&script_path, "#!/bin/bash\necho 'test'").unwrap();
-            
+
             // Make executable on Unix
             #[cfg(unix)]
             {
@@ -624,30 +641,36 @@ mod tests {
                 let mut perms = fs::metadata(&script_path).unwrap().permissions();
                 perms.set_mode(0o755);
                 fs::set_permissions(&script_path, perms).unwrap();
-                
+
                 // Verify it's executable
-                assert!(HookConfig::is_executable(&script_path), 
-                    "Script should be executable: {}", script_path.display());
+                assert!(
+                    HookConfig::is_executable(&script_path),
+                    "Script should be executable: {}",
+                    script_path.display()
+                );
             }
-            
+
             // On Windows, rename to .bat to make it executable
             #[cfg(windows)]
             {
                 let new_path = script_path.with_extension("bat");
                 fs::rename(&script_path, &new_path).unwrap();
-                assert!(HookConfig::is_executable(&new_path), 
-                    "Script should be executable: {}", new_path.display());
+                assert!(
+                    HookConfig::is_executable(&new_path),
+                    "Script should be executable: {}",
+                    new_path.display()
+                );
             }
         }
-        
+
         println!("Created scripts in: {}", temp_dir.path().display());
-        
+
         let collection = HookConfigCollection::load_from_dir(temp_dir.path()).unwrap();
         println!("Found {} hooks", collection.hooks.len());
         for hook in &collection.hooks {
             println!("Hook: {} -> {:?}", hook.path.display(), hook.events);
         }
-        
+
         assert_eq!(collection.hooks.len(), 3);
     }
 
@@ -655,42 +678,58 @@ mod tests {
     fn test_config_file_operations() {
         let temp_dir = TempDir::new().unwrap();
         let config_file = temp_dir.path().join("hooks.toml");
-        
+
         let mut collection = HookConfigCollection::new();
-        collection.global_env.insert("GLOBAL_VAR".to_string(), "global_value".to_string());
+        collection
+            .global_env
+            .insert("GLOBAL_VAR".to_string(), "global_value".to_string());
         collection.global_timeout = Some(30);
-        
+
         // Save configuration
         collection.save_to_file(&config_file).unwrap();
         assert!(config_file.exists());
-        
+
         // Load configuration
         let loaded = HookConfigCollection::load_from_file(&config_file).unwrap();
-        assert_eq!(loaded.global_env.get("GLOBAL_VAR"), Some(&"global_value".to_string()));
+        assert_eq!(
+            loaded.global_env.get("GLOBAL_VAR"),
+            Some(&"global_value".to_string())
+        );
         assert_eq!(loaded.global_timeout, Some(30));
     }
 
     #[test]
     fn test_collection_merging() {
         let mut base = HookConfigCollection::new();
-        base.global_env.insert("BASE_VAR".to_string(), "base_value".to_string());
-        
+        base.global_env
+            .insert("BASE_VAR".to_string(), "base_value".to_string());
+
         let mut override_collection = HookConfigCollection::new();
-        override_collection.global_env.insert("OVERRIDE_VAR".to_string(), "override_value".to_string());
-        override_collection.global_env.insert("BASE_VAR".to_string(), "overridden_value".to_string());
-        
+        override_collection
+            .global_env
+            .insert("OVERRIDE_VAR".to_string(), "override_value".to_string());
+        override_collection
+            .global_env
+            .insert("BASE_VAR".to_string(), "overridden_value".to_string());
+
         let merged = HookConfigCollection::merge_collections(base, override_collection);
-        
-        assert_eq!(merged.global_env.get("BASE_VAR"), Some(&"overridden_value".to_string()));
-        assert_eq!(merged.global_env.get("OVERRIDE_VAR"), Some(&"override_value".to_string()));
+
+        assert_eq!(
+            merged.global_env.get("BASE_VAR"),
+            Some(&"overridden_value".to_string())
+        );
+        assert_eq!(
+            merged.global_env.get("OVERRIDE_VAR"),
+            Some(&"override_value".to_string())
+        );
     }
 
-    #[test] 
+    #[test]
     fn test_standard_location_discovery() {
         let temp_dir = TempDir::new().unwrap();
         let script_path = temp_dir.path().join("test_hook.sh");
         fs::write(&script_path, "#!/bin/bash\necho 'test'").unwrap();
-        
+
         // This test validates the discovery mechanism works
         let collection = HookConfigCollection::load_from_dir(temp_dir.path()).unwrap();
         assert!(collection.hooks.is_empty()); // No executable scripts created
@@ -700,13 +739,18 @@ mod tests {
     fn test_config_serialization() {
         let temp_dir = TempDir::new().unwrap();
         let config_file = temp_dir.path().join("test_config.toml");
-        
+
         let mut collection = HookConfigCollection::new();
-        collection.global_env.insert("GLOBAL_VAR".to_string(), "global_value".to_string());
-        
+        collection
+            .global_env
+            .insert("GLOBAL_VAR".to_string(), "global_value".to_string());
+
         collection.save_to_file(&config_file).unwrap();
         let loaded = HookConfigCollection::load_from_file(&config_file).unwrap();
-        
-        assert_eq!(loaded.global_env.get("GLOBAL_VAR"), Some(&"global_value".to_string()));
+
+        assert_eq!(
+            loaded.global_env.get("GLOBAL_VAR"),
+            Some(&"global_value".to_string())
+        );
     }
 }

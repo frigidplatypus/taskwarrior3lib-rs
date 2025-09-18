@@ -5,12 +5,12 @@
 
 pub mod discovery;
 
+use crate::error::{ConfigError, TaskError};
+use discovery::discover_all_paths;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
-use crate::error::{ConfigError, TaskError};
-use discovery::discover_all_paths;
 
 /// Main configuration structure
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -46,44 +46,46 @@ impl Configuration {
             settings: HashMap::new(),
             create_dirs: true,
         };
-        
+
         // Load settings from .taskrc if it exists
         if config.config_file.exists() {
             config.load_from_file(&paths.taskrc)?;
         }
-        
+
         Ok(config)
     }
-    
+
     /// Load configuration from a specific file
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, ConfigError> {
         let path = path.as_ref();
-        let mut config: Configuration = Configuration { config_file: path.to_path_buf(), ..Default::default() };
+        let mut config: Configuration = Configuration {
+            config_file: path.to_path_buf(),
+            ..Default::default()
+        };
         config.load_from_file(path)?;
         Ok(config)
     }
-    
+
     /// Load settings from .taskrc file
     fn load_from_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), ConfigError> {
-        let content = fs::read_to_string(path.as_ref())
-            .map_err(|e| ConfigError::Io { 
-                path: path.as_ref().to_path_buf(),
-                source: e 
-            })?;
-        
+        let content = fs::read_to_string(path.as_ref()).map_err(|e| ConfigError::Io {
+            path: path.as_ref().to_path_buf(),
+            source: e,
+        })?;
+
         for (line_num, line) in content.lines().enumerate() {
             let line = line.trim();
-            
+
             // Skip comments and empty lines
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-            
+
             // Parse key=value pairs
             if let Some((key, value)) = line.split_once('=') {
                 let key = key.trim();
                 let value = value.trim();
-                
+
                 // Handle special keys
                 match key {
                     "data.location" => {
@@ -100,54 +102,54 @@ impl Configuration {
                 });
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Get a configuration value
     pub fn get(&self, key: &str) -> Option<&String> {
         self.settings.get(key)
     }
-    
+
     /// Get a configuration value with default
     pub fn get_or(&self, key: &str, default: &str) -> String {
-        self.settings.get(key)
+        self.settings
+            .get(key)
             .cloned()
             .unwrap_or_else(|| default.to_string())
     }
-    
+
     /// Set a configuration value
     pub fn set<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) {
         self.settings.insert(key.into(), value.into());
     }
-    
+
     /// Get the task data file path
     pub fn task_data_file(&self) -> PathBuf {
         self.data_dir.join("pending.data")
     }
-    
+
     /// Get the completed tasks file path  
     pub fn completed_data_file(&self) -> PathBuf {
         self.data_dir.join("completed.data")
     }
-    
+
     /// Get the undo data file path
     pub fn undo_data_file(&self) -> PathBuf {
         self.data_dir.join("undo.data")
     }
-    
+
     /// Ensure data directory exists
     pub fn ensure_data_dir(&self) -> Result<(), ConfigError> {
         if !self.data_dir.exists() && self.create_dirs {
-            fs::create_dir_all(&self.data_dir)
-                .map_err(|e| ConfigError::Io {
-                    path: self.data_dir.clone(),
-                    source: e,
-                })?;
+            fs::create_dir_all(&self.data_dir).map_err(|e| ConfigError::Io {
+                path: self.data_dir.clone(),
+                source: e,
+            })?;
         }
         Ok(())
     }
-    
+
     /// Validate configuration
     pub fn validate(&self) -> Result<(), ConfigError> {
         // Check data directory is accessible
@@ -157,11 +159,14 @@ impl Configuration {
                 message: "Data directory does not exist".to_string(),
             });
         }
-        
+
         // Validate known boolean settings
         for (key, value) in &self.settings {
             if (key.ends_with(".confirmation") || key.starts_with("verbose"))
-                && !matches!(value.as_str(), "true" | "false" | "on" | "off" | "yes" | "no" | "1" | "0")
+                && !matches!(
+                    value.as_str(),
+                    "true" | "false" | "on" | "off" | "yes" | "no" | "1" | "0"
+                )
             {
                 return Err(ConfigError::InvalidValue {
                     key: key.clone(),
@@ -170,7 +175,7 @@ impl Configuration {
                 });
             }
         }
-        
+
         Ok(())
     }
 }
@@ -192,31 +197,31 @@ impl ConfigurationBuilder {
             ..Default::default()
         }
     }
-    
+
     /// Set custom data directory
     pub fn data_dir<P: Into<PathBuf>>(mut self, path: P) -> Self {
         self.data_dir = Some(path.into());
         self
     }
-    
+
     /// Set custom config file
     pub fn config_file<P: Into<PathBuf>>(mut self, path: P) -> Self {
         self.config_file = Some(path.into());
         self
     }
-    
+
     /// Add configuration override
     pub fn set<K: Into<String>, V: Into<String>>(mut self, key: K, value: V) -> Self {
         self.overrides.insert(key.into(), value.into());
         self
     }
-    
+
     /// Set whether to create missing directories
     pub fn create_dirs(mut self, create: bool) -> Self {
         self.create_dirs = create;
         self
     }
-    
+
     /// Build the configuration
     pub fn build(self) -> Result<Configuration, ConfigError> {
         let mut config = if let Some(config_file) = self.config_file {
@@ -224,21 +229,21 @@ impl ConfigurationBuilder {
         } else {
             Configuration::from_xdg()?
         };
-        
+
         // Apply overrides
         if let Some(data_dir) = self.data_dir {
             config.data_dir = data_dir;
         }
-        
+
         config.create_dirs = self.create_dirs;
-        
+
         for (key, value) in self.overrides {
             config.set(key, value);
         }
-        
+
         config.validate()?;
         config.ensure_data_dir()?;
-        
+
         Ok(config)
     }
 }
@@ -247,10 +252,10 @@ impl ConfigurationBuilder {
 pub trait ConfigurationProvider {
     /// Get the current configuration
     fn config(&self) -> &Configuration;
-    
+
     /// Get mutable configuration
     fn config_mut(&mut self) -> &mut Configuration;
-    
+
     /// Reload configuration from disk
     fn reload_config(&mut self) -> Result<(), TaskError>;
 }
@@ -258,8 +263,8 @@ pub trait ConfigurationProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn test_default_configuration() {
@@ -272,31 +277,31 @@ mod tests {
     #[test]
     fn test_configuration_builder() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = TempDir::new()?;
-        
+
         let config = ConfigurationBuilder::new()
             .data_dir(temp_dir.path().join("data"))
             .set("verbose", "true")
             .build()?;
-        
+
         assert_eq!(config.data_dir, temp_dir.path().join("data"));
         assert_eq!(config.get("verbose"), Some(&"true".to_string()));
-        
+
         Ok(())
     }
-    
-    #[test] 
+
+    #[test]
     fn test_taskrc_parsing() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = TempDir::new()?;
         let taskrc_path = temp_dir.path().join(".taskrc");
-        
-        fs::write(&taskrc_path, 
+
+        fs::write(&taskrc_path,
             "# Taskwarrior configuration\ndata.location=/tmp/taskdata\nverbose=on\nconfirmation=off\n")?;
-        
+
         let config = Configuration::from_file(&taskrc_path)?;
         assert_eq!(config.data_dir, PathBuf::from("/tmp/taskdata"));
         assert_eq!(config.get("verbose"), Some(&"on".to_string()));
         assert_eq!(config.get("confirmation"), Some(&"off".to_string()));
-        
+
         Ok(())
     }
 }

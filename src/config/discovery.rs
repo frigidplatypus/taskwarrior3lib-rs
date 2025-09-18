@@ -3,9 +3,9 @@
 //! This module handles discovery of configuration and data directories
 //! following the XDG Base Directory specification.
 
+use crate::error::ConfigError;
 use std::env;
 use std::path::PathBuf;
-use crate::error::ConfigError;
 
 /// Discover the default Taskwarrior data directory
 pub fn discover_data_dir() -> Result<PathBuf, ConfigError> {
@@ -13,7 +13,7 @@ pub fn discover_data_dir() -> Result<PathBuf, ConfigError> {
     // 1. TASKDATA environment variable
     // 2. XDG_DATA_HOME/taskwarrior
     // 3. ~/.local/share/taskwarrior (fallback)
-    
+
     if let Ok(taskdata) = env::var("TASKDATA") {
         let path = PathBuf::from(taskdata);
         if path.is_absolute() {
@@ -25,7 +25,7 @@ pub fn discover_data_dir() -> Result<PathBuf, ConfigError> {
             });
         }
     }
-    
+
     // Try XDG_DATA_HOME
     if let Ok(xdg_data) = env::var("XDG_DATA_HOME") {
         let xdg_path = PathBuf::from(&xdg_data);
@@ -34,7 +34,7 @@ pub fn discover_data_dir() -> Result<PathBuf, ConfigError> {
             return Ok(path);
         }
     }
-    
+
     // Fall back to default XDG location
     if let Some(home_dir) = dirs::home_dir() {
         Ok(home_dir.join(".local").join("share").join("taskwarrior"))
@@ -48,9 +48,9 @@ pub fn discover_data_dir() -> Result<PathBuf, ConfigError> {
 /// Discover the default Taskwarrior config directory
 pub fn discover_config_dir() -> Result<PathBuf, ConfigError> {
     // Priority order:
-    // 1. XDG_CONFIG_HOME/taskwarrior 
+    // 1. XDG_CONFIG_HOME/taskwarrior
     // 2. ~/.config/taskwarrior (fallback)
-    
+
     if let Ok(xdg_config) = env::var("XDG_CONFIG_HOME") {
         let xdg_path = PathBuf::from(&xdg_config);
         if xdg_path.is_absolute() {
@@ -58,7 +58,7 @@ pub fn discover_config_dir() -> Result<PathBuf, ConfigError> {
             return Ok(path);
         }
     }
-    
+
     if let Some(home_dir) = dirs::home_dir() {
         Ok(home_dir.join(".config").join("taskwarrior"))
     } else {
@@ -73,9 +73,9 @@ pub fn discover_taskrc() -> Result<PathBuf, ConfigError> {
     // Priority order:
     // 1. TASKRC environment variable
     // 2. XDG_CONFIG_HOME/taskwarrior/taskrc
-    // 3. ~/.config/taskwarrior/taskrc 
+    // 3. ~/.config/taskwarrior/taskrc
     // 4. ~/.taskrc (legacy fallback)
-    
+
     if let Ok(taskrc) = env::var("TASKRC") {
         let path = PathBuf::from(taskrc);
         if path.is_absolute() {
@@ -87,14 +87,14 @@ pub fn discover_taskrc() -> Result<PathBuf, ConfigError> {
             });
         }
     }
-    
+
     // Try XDG config directory first
     let config_dir = discover_config_dir()?;
     let xdg_taskrc = config_dir.join("taskrc");
     if xdg_taskrc.exists() {
         return Ok(xdg_taskrc);
     }
-    
+
     // Fall back to legacy location
     if let Some(home_dir) = dirs::home_dir() {
         let legacy_taskrc = home_dir.join(".taskrc");
@@ -132,20 +132,20 @@ impl TaskwarriorPaths {
     pub fn required_dirs(&self) -> Vec<&PathBuf> {
         vec![&self.data_dir, &self.config_dir]
     }
-    
+
     /// Get the parent directory of taskrc (for creation)
     pub fn taskrc_dir(&self) -> Option<PathBuf> {
         self.taskrc.parent().map(|p| p.to_path_buf())
     }
-    
+
     /// Validate that all paths are absolute
     pub fn validate(&self) -> Result<(), ConfigError> {
         let paths = [
             ("data_dir", &self.data_dir),
-            ("config_dir", &self.config_dir), 
+            ("config_dir", &self.config_dir),
             ("taskrc", &self.taskrc),
         ];
-        
+
         for (name, path) in &paths {
             if !path.is_absolute() {
                 return Err(ConfigError::InvalidPath {
@@ -154,7 +154,7 @@ impl TaskwarriorPaths {
                 });
             }
         }
-        
+
         Ok(())
     }
 }
@@ -189,7 +189,7 @@ mod tests {
         // Ensure no environment variables interfere
         env::remove_var("TASKDATA");
         env::remove_var("XDG_DATA_HOME");
-        
+
         let data_dir = discover_data_dir().unwrap();
         assert!(data_dir.is_absolute());
         assert!(data_dir.to_string_lossy().contains("taskwarrior"));
@@ -200,25 +200,25 @@ mod tests {
         let _guard = ENV_MUTEX.get_or_init(|| Mutex::new(())).lock().unwrap();
         let temp_path = "/tmp/test_taskdata";
         env::set_var("TASKDATA", temp_path);
-        
+
         // Call the function after setting the env var
         let data_dir = discover_data_dir().unwrap();
         assert_eq!(data_dir, PathBuf::from(temp_path));
-        
+
         // Clean up
         env::remove_var("TASKDATA");
     }
-    
+
     #[test]
     fn test_taskdata_relative_path_error() {
         let _guard = ENV_MUTEX.get_or_init(|| Mutex::new(())).lock().unwrap();
         // Set relative path
         env::set_var("TASKDATA", "relative/path");
-        
+
         let result = discover_data_dir();
         // Clean up first to avoid affecting other tests
         env::remove_var("TASKDATA");
-        
+
         assert!(result.is_err());
         if let Err(ConfigError::InvalidPath { path, message: _ }) = result {
             assert_eq!(path, PathBuf::from("relative/path"));
@@ -233,17 +233,17 @@ mod tests {
         assert!(paths.data_dir.is_absolute());
         assert!(paths.config_dir.is_absolute());
         assert!(paths.taskrc.is_absolute());
-        
+
         // Test validation
         assert!(paths.validate().is_ok());
     }
-    
+
     #[test]
     fn test_required_dirs() {
         let _guard = ENV_MUTEX.get_or_init(|| Mutex::new(())).lock().unwrap();
         // Clear any TASKDATA env var that might be set from other tests
         env::remove_var("TASKDATA");
-        
+
         let paths = discover_all_paths().unwrap();
         let required = paths.required_dirs();
         assert_eq!(required.len(), 2);

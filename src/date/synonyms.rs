@@ -14,7 +14,7 @@ pub enum DateSynonym {
     Today,
     Yesterday,
     Tomorrow,
-    
+
     // Weekdays (full names)
     Monday,
     Tuesday,
@@ -23,7 +23,7 @@ pub enum DateSynonym {
     Friday,
     Saturday,
     Sunday,
-    
+
     // Weekday abbreviations
     Mon,
     Tue,
@@ -32,25 +32,25 @@ pub enum DateSynonym {
     Fri,
     Sat,
     Sun,
-    
+
     // Week references
     Weekdays,
     Weekend,
-    
+
     // Month boundaries
     Som, // Start of month
     Eom, // End of month
-    
+
     // Year boundaries
     Soy, // Start of year
     Eoy, // End of year
-    
+
     // Quarter references
     Q1,
     Q2,
     Q3,
     Q4,
-    
+
     // Special holidays (basic set)
     NewYear,
     Valentine,
@@ -59,7 +59,7 @@ pub enum DateSynonym {
     Halloween,
     Thanksgiving,
     Christmas,
-    
+
     // Relative time units (for use in expressions)
     Second,
     Minute,
@@ -120,7 +120,7 @@ impl DateSynonym {
             DateSynonym::Year,
         ]
     }
-    
+
     /// Get synonyms that represent absolute dates
     pub fn absolute_synonyms() -> Vec<DateSynonym> {
         vec![
@@ -145,7 +145,7 @@ impl DateSynonym {
             DateSynonym::Q4,
         ]
     }
-    
+
     /// Get synonyms that represent time units (for relative calculations)
     pub fn time_unit_synonyms() -> Vec<DateSynonym> {
         vec![
@@ -159,7 +159,7 @@ impl DateSynonym {
             DateSynonym::Year,
         ]
     }
-    
+
     /// Get holiday synonyms
     pub fn holiday_synonyms() -> Vec<DateSynonym> {
         vec![
@@ -172,37 +172,58 @@ impl DateSynonym {
             DateSynonym::Christmas,
         ]
     }
-    
+
     // Parsing is provided via the std::str::FromStr trait implementation below.
-    
+
     // Use Display implementation for canonical string representation.
-    
+
     /// Check if this synonym represents a weekday
     pub fn is_weekday(&self) -> bool {
-        matches!(self,
-            DateSynonym::Monday | DateSynonym::Tuesday | DateSynonym::Wednesday |
-            DateSynonym::Thursday | DateSynonym::Friday | DateSynonym::Saturday |
-            DateSynonym::Sunday | DateSynonym::Mon | DateSynonym::Tue |
-            DateSynonym::Wed | DateSynonym::Thu | DateSynonym::Fri |
-            DateSynonym::Sat | DateSynonym::Sun
+        matches!(
+            self,
+            DateSynonym::Monday
+                | DateSynonym::Tuesday
+                | DateSynonym::Wednesday
+                | DateSynonym::Thursday
+                | DateSynonym::Friday
+                | DateSynonym::Saturday
+                | DateSynonym::Sunday
+                | DateSynonym::Mon
+                | DateSynonym::Tue
+                | DateSynonym::Wed
+                | DateSynonym::Thu
+                | DateSynonym::Fri
+                | DateSynonym::Sat
+                | DateSynonym::Sun
         )
     }
-    
+
     /// Check if this synonym represents a time unit
     pub fn is_time_unit(&self) -> bool {
-        matches!(self,
-            DateSynonym::Second | DateSynonym::Minute | DateSynonym::Hour |
-            DateSynonym::Day | DateSynonym::Week | DateSynonym::Month |
-            DateSynonym::Quarter | DateSynonym::Year
+        matches!(
+            self,
+            DateSynonym::Second
+                | DateSynonym::Minute
+                | DateSynonym::Hour
+                | DateSynonym::Day
+                | DateSynonym::Week
+                | DateSynonym::Month
+                | DateSynonym::Quarter
+                | DateSynonym::Year
         )
     }
-    
+
     /// Check if this synonym represents a holiday
     pub fn is_holiday(&self) -> bool {
-        matches!(self,
-            DateSynonym::NewYear | DateSynonym::Valentine | DateSynonym::Easter |
-            DateSynonym::Independence | DateSynonym::Halloween | DateSynonym::Thanksgiving |
-            DateSynonym::Christmas
+        matches!(
+            self,
+            DateSynonym::NewYear
+                | DateSynonym::Valentine
+                | DateSynonym::Easter
+                | DateSynonym::Independence
+                | DateSynonym::Halloween
+                | DateSynonym::Thanksgiving
+                | DateSynonym::Christmas
         )
     }
 }

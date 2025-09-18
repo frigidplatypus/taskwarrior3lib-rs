@@ -2,10 +2,10 @@
 //!
 //! This module contains the core Task struct and related types.
 
-use std::collections::{HashMap, HashSet};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use uuid::Uuid;
 
 use crate::task::{Annotation, RecurrencePattern};
 
@@ -153,7 +153,7 @@ impl Task {
             start: None,
         }
     }
-    
+
     /// Mark task as completed
     pub fn complete(&mut self) {
         self.status = TaskStatus::Completed;
@@ -162,7 +162,7 @@ impl Task {
         self.active = false;
         self.start = None;
     }
-    
+
     /// Mark task as deleted
     pub fn delete(&mut self) {
         self.status = TaskStatus::Deleted;
@@ -171,27 +171,27 @@ impl Task {
         self.active = false;
         self.start = None;
     }
-    
+
     /// Start working on task (time tracking)
     pub fn start(&mut self) {
         self.active = true;
         self.start = Some(Utc::now());
         self.modified = Some(Utc::now());
     }
-    
+
     /// Stop working on task (time tracking)
     pub fn stop(&mut self) {
         self.active = false;
         self.start = None;
         self.modified = Some(Utc::now());
     }
-    
+
     /// Add a tag to the task
     pub fn add_tag(&mut self, tag: String) {
         self.tags.insert(tag);
         self.modified = Some(Utc::now());
     }
-    
+
     /// Remove a tag from the task
     pub fn remove_tag(&mut self, tag: &str) -> bool {
         let removed = self.tags.remove(tag);
@@ -200,18 +200,18 @@ impl Task {
         }
         removed
     }
-    
+
     /// Check if task has a specific tag
     pub fn has_tag(&self, tag: &str) -> bool {
         self.tags.contains(tag)
     }
-    
+
     /// Add an annotation to the task
     pub fn add_annotation(&mut self, annotation: Annotation) {
         self.annotations.push(annotation);
         self.modified = Some(Utc::now());
     }
-    
+
     /// Remove an annotation by description
     pub fn remove_annotation(&mut self, description: &str) -> bool {
         let initial_len = self.annotations.len();
@@ -222,12 +222,12 @@ impl Task {
         }
         removed
     }
-    
+
     /// Check if task is overdue
     pub fn is_overdue(&self) -> bool {
-    self.due.is_some_and(|due| due < Utc::now()) && self.status == TaskStatus::Pending
+        self.due.is_some_and(|due| due < Utc::now()) && self.status == TaskStatus::Pending
     }
-    
+
     /// Check if task is active (being worked on)
     pub fn is_active(&self) -> bool {
         self.active && self.start.is_some()
@@ -260,7 +260,7 @@ mod tests {
         let mut task = Task::new("Test task".to_string());
         task.add_tag("important".to_string());
         assert!(task.has_tag("important"));
-        
+
         let removed = task.remove_tag("important");
         assert!(removed);
         assert!(!task.has_tag("important"));
@@ -271,7 +271,7 @@ mod tests {
         let mut task = Task::new("Test task".to_string());
         task.start();
         assert!(task.is_active());
-        
+
         task.stop();
         assert!(!task.is_active());
     }

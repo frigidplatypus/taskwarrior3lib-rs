@@ -22,7 +22,7 @@
 //! use taskwarriorlib::query::TaskQueryBuilder;
 //! use taskwarriorlib::query::TaskQueryBuilderImpl;
 //! use taskwarriorlib::TaskManager;
-//! 
+//!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Build configuration (defaults to XDG discovery)
 //! let config = ConfigurationBuilder::new().build()?;
@@ -49,9 +49,9 @@
 // Re-export main types for convenience
 pub use config::{Configuration, ConfigurationBuilder};
 pub use date::{DateParser, DateSynonym};
-pub use error::{TaskError, ConfigError, QueryError};
+pub use error::{ConfigError, QueryError, TaskError};
 pub use query::{TaskQuery, TaskQueryBuilder, TaskQueryBuilderImpl};
-pub use task::{Task, TaskStatus, Priority, Annotation};
+pub use task::{Annotation, Priority, Task, TaskStatus};
 
 // Module declarations
 pub mod config;
@@ -70,7 +70,7 @@ pub mod task;
 pub use config::ConfigurationProvider;
 pub use task::{TaskManager, TaskManagerBuilder};
 // Hook system traits and types
-pub use hooks::{HookSystem, DefaultHookSystem};
+pub use hooks::{DefaultHookSystem, HookSystem};
 pub use query::builder::QueryBuilder;
 
 /// Library version

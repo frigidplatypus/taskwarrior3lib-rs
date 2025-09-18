@@ -23,7 +23,7 @@ impl Context {
             description: None,
         }
     }
-    
+
     pub fn with_description(mut self, description: String) -> Self {
         self.description = Some(description);
         self

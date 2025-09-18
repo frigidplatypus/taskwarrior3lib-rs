@@ -1,11 +1,10 @@
 use crate::error::TaskError;
 use crate::task::Task;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 
 /// Export format options
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum ExportFormat {
     #[default]
     Json,
@@ -45,7 +44,7 @@ impl TaskExporter {
     pub fn new() -> Self {
         TaskExporter
     }
-    
+
     /// Export tasks to string
     pub fn export_tasks_to_string(
         &self,
@@ -58,13 +57,13 @@ impl TaskExporter {
             message: format!("Failed to convert exported data to string: {e}"),
         })
     }
-    
+
     /// Export tasks to writer
     pub fn export_tasks<W: Write>(
         &self,
         tasks: &[Task],
         writer: &mut W,
-    config: &ExportConfig,
+        config: &ExportConfig,
     ) -> Result<usize, TaskError> {
         // Filter tasks based on config (and optional filter expression)
         let filtered_tasks: Vec<_> = tasks
@@ -113,7 +112,7 @@ impl TaskExporter {
 
         Ok(filtered_tasks.len())
     }
-    
+
     /// Check if task should be included in export
     fn should_include_task(&self, task: &Task, config: &ExportConfig) -> bool {
         // Basic filtering - more complex filtering should be done via TaskQuery
@@ -123,7 +122,7 @@ impl TaskExporter {
             _ => true,
         }
     }
-    
+
     /// Export as CSV
     fn export_csv<W: Write>(
         &self,
@@ -156,7 +155,7 @@ impl TaskExporter {
             fields.push(cf.clone());
         }
 
-    writeln!(writer, "{}", fields.join(",")).map_err(TaskError::Io)?;
+        writeln!(writer, "{}", fields.join(",")).map_err(TaskError::Io)?;
 
         for task in tasks {
             let mut row = Vec::new();
@@ -168,9 +167,15 @@ impl TaskExporter {
                     "status" => format!("{:?}", task.status),
                     "project" => task.project.as_deref().unwrap_or("").to_string(),
                     "priority" => task.priority.map(|p| format!("{p:?}")).unwrap_or_default(),
-                    "due" => task.due.map(|d| d.format("%Y-%m-%d %H:%M:%S").to_string()).unwrap_or_default(),
+                    "due" => task
+                        .due
+                        .map(|d| d.format("%Y-%m-%d %H:%M:%S").to_string())
+                        .unwrap_or_default(),
                     "entry" => task.entry.format("%Y-%m-%d %H:%M:%S").to_string(),
-                    "modified" => task.modified.map(|m| m.format("%Y-%m-%d %H:%M:%S").to_string()).unwrap_or_default(),
+                    "modified" => task
+                        .modified
+                        .map(|m| m.format("%Y-%m-%d %H:%M:%S").to_string())
+                        .unwrap_or_default(),
                     "tags" => {
                         if config.include_tags {
                             let mut tags: Vec<_> = task.tags.iter().cloned().collect();
@@ -182,7 +187,11 @@ impl TaskExporter {
                     }
                     "annotations" => {
                         if config.include_annotations {
-                            let mut ann_texts: Vec<String> = task.annotations.iter().map(|a| a.description.clone()).collect();
+                            let mut ann_texts: Vec<String> = task
+                                .annotations
+                                .iter()
+                                .map(|a| a.description.clone())
+                                .collect();
                             ann_texts.sort();
                             format!("\"{}\"", ann_texts.join("; "))
                         } else {
@@ -210,7 +219,7 @@ impl TaskExporter {
 
         Ok(())
     }
-    
+
     /// Export in Taskwarrior format
     fn export_taskwarrior<W: Write>(
         &self,
@@ -220,36 +229,36 @@ impl TaskExporter {
     ) -> Result<(), TaskError> {
         for task in tasks {
             let mut line = format!("[description:\"{}\"", task.description);
-            
+
             line.push_str(&format!(" status:{:?}", task.status));
             line.push_str(&format!(" entry:{}", task.entry.format("%Y%m%dT%H%M%SZ")));
-            
+
             if let Some(ref project) = task.project {
                 line.push_str(&format!(" project:{project}"));
             }
-            
+
             if let Some(priority) = task.priority {
                 line.push_str(&format!(" priority:{priority:?}"));
             }
-            
+
             if let Some(due) = task.due {
                 line.push_str(&format!(" due:{}", due.format("%Y%m%dT%H%M%SZ")));
             }
-            
+
             if let Some(modified) = task.modified {
                 line.push_str(&format!(" modified:{}", modified.format("%Y%m%dT%H%M%SZ")));
             }
-            
+
             if config.include_tags && !task.tags.is_empty() {
                 for tag in &task.tags {
                     line.push_str(&format!(" +{tag}"));
                 }
             }
-            
+
             line.push(']');
             writeln!(writer, "{line}").map_err(TaskError::Io)?;
         }
-        
+
         Ok(())
     }
 }
@@ -262,43 +271,45 @@ mod tests {
     fn test_json_export() {
         let task = Task::new("Test task".to_string());
         let tasks = vec![task];
-        
+
         let exporter = TaskExporter::new();
         let result = exporter.export_tasks_to_string(&tasks, &ExportConfig::default());
         assert!(result.is_ok());
-        
+
         let json = result.unwrap();
         assert!(json.contains("Test task"));
         assert!(json.starts_with('['));
         assert!(json.ends_with(']'));
     }
-    
+
     #[test]
     fn test_csv_export() {
         let mut task = Task::new("Test task".to_string());
         task.project = Some("TestProject".to_string());
-        task.tags = vec!["tag1".to_string(), "tag2".to_string()].into_iter().collect();
-        
+        task.tags = vec!["tag1".to_string(), "tag2".to_string()]
+            .into_iter()
+            .collect();
+
         let tasks = vec![task];
         let exporter = TaskExporter::new();
         let config = ExportConfig::new(ExportFormat::Csv);
         let result = exporter.export_tasks_to_string(&tasks, &config);
         assert!(result.is_ok());
-        
+
         let csv = result.unwrap();
         assert!(csv.contains("Test task"));
         assert!(csv.contains("TestProject"));
         assert!(csv.contains("tag1,tag2"));
     }
-    
+
     #[test]
     fn test_export_basic() {
         let task = Task::new("Test task".to_string());
         let tasks = vec![task];
-        
+
         let exporter = TaskExporter::new();
         let result = exporter.export_tasks_to_string(&tasks, &ExportConfig::default());
-        
+
         assert!(result.is_ok());
         let output = result.unwrap();
         assert!(!output.is_empty());

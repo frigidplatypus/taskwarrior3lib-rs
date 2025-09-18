@@ -63,9 +63,9 @@
 //! assert_eq!(script_name, "pre-add");
 //! ```
 
-use crate::task::Task;
 use crate::error::TaskError;
-use serde::{Serialize, Deserialize};
+use crate::task::Task;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Hook event types that trigger script execution
@@ -102,21 +102,23 @@ pub enum HookEvent {
 impl HookEvent {
     /// Check if this is a pre-operation event
     pub fn is_pre_event(&self) -> bool {
-        matches!(self, 
-            HookEvent::PreAdd | 
-            HookEvent::PreModify | 
-            HookEvent::PreDelete | 
-            HookEvent::PreOperation(_)
+        matches!(
+            self,
+            HookEvent::PreAdd
+                | HookEvent::PreModify
+                | HookEvent::PreDelete
+                | HookEvent::PreOperation(_)
         )
     }
-    
+
     /// Check if this is a post-operation event
     pub fn is_post_event(&self) -> bool {
-        matches!(self, 
-            HookEvent::PostAdd | 
-            HookEvent::PostModify | 
-            HookEvent::PostDelete | 
-            HookEvent::PostOperation(_)
+        matches!(
+            self,
+            HookEvent::PostAdd
+                | HookEvent::PostModify
+                | HookEvent::PostDelete
+                | HookEvent::PostOperation(_)
         )
     }
 }
@@ -167,7 +169,7 @@ impl HookContext {
             data: HashMap::new(),
         }
     }
-    
+
     /// Create context with a task
     pub fn with_task(event: HookEvent, task: Task) -> Self {
         Self {
@@ -177,7 +179,7 @@ impl HookContext {
             data: HashMap::new(),
         }
     }
-    
+
     /// Create context for modify operations
     pub fn with_modify(event: HookEvent, old_task: Task, new_task: Task) -> Self {
         Self {
@@ -187,7 +189,7 @@ impl HookContext {
             data: HashMap::new(),
         }
     }
-    
+
     /// Add additional context data
     pub fn with_data<K: Into<String>, V: Into<String>>(mut self, key: K, value: V) -> Self {
         self.data.insert(key.into(), value.into());

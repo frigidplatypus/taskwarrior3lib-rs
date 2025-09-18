@@ -2,10 +2,10 @@
 //!
 //! This module provides the TaskQueryBuilder implementation.
 
-use crate::query::{TaskQuery, ProjectFilter, TagFilter, DateFilter, SortCriteria};
-#[allow(unused_imports)]
-use crate::task::{TaskStatus, Priority};
 use crate::error::QueryError;
+use crate::query::{DateFilter, ProjectFilter, SortCriteria, TagFilter, TaskQuery};
+#[allow(unused_imports)]
+use crate::task::{Priority, TaskStatus};
 use chrono::{DateTime, Utc};
 
 /// TaskQueryBuilder implementation
@@ -50,7 +50,7 @@ impl TaskQueryBuilder for TaskQueryBuilderImpl {
     }
 
     fn tag(mut self, tag: String) -> Self {
-    self.tag_filter = Some(TagFilter::has_tag(tag));
+        self.tag_filter = Some(TagFilter::has_tag(tag));
         self
     }
 
@@ -101,10 +101,10 @@ impl TaskQueryBuilder for TaskQueryBuilderImpl {
 pub trait QueryBuilder {
     type Query;
     type Error;
-    
+
     /// Validate the built query
     fn validate(&self) -> Result<(), Self::Error>;
-    
+
     /// Build and validate the query
     fn build_validated(self) -> Result<Self::Query, Self::Error>;
 }
@@ -112,7 +112,7 @@ pub trait QueryBuilder {
 impl QueryBuilder for TaskQueryBuilderImpl {
     type Query = TaskQuery;
     type Error = QueryError;
-    
+
     fn validate(&self) -> Result<(), Self::Error> {
         // Basic validation - can be extended later
         if self.limit == Some(0) {
@@ -120,7 +120,7 @@ impl QueryBuilder for TaskQueryBuilderImpl {
         }
         Ok(())
     }
-    
+
     fn build_validated(self) -> Result<Self::Query, Self::Error> {
         self.validate()?;
         self.build()
@@ -139,7 +139,7 @@ mod tests {
             .project("Work".to_string())
             .build()
             .unwrap();
-        
+
         assert_eq!(query.status, Some(TaskStatus::Pending));
         assert!(matches!(query.project_filter, Some(ProjectFilter::Equals(ref p)) if p == "Work"));
     }

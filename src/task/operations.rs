@@ -3,9 +3,9 @@
 //! This module will contain CRUD operations for tasks.
 //! Currently a placeholder for compilation.
 
-use uuid::Uuid;
-use crate::task::Task;
 use crate::error::TaskError;
+use crate::task::Task;
+use uuid::Uuid;
 
 /// Add a new task (placeholder)
 pub fn add_task(description: String) -> Result<Task, TaskError> {

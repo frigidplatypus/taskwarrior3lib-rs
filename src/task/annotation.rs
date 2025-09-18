@@ -2,8 +2,8 @@
 //!
 //! This module contains annotation and priority related types.
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 /// Notes attached to tasks with timestamps
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -22,13 +22,10 @@ impl Annotation {
             description,
         }
     }
-    
+
     /// Create an annotation with specific timestamp
     pub fn with_timestamp(description: String, entry: DateTime<Utc>) -> Self {
-        Self {
-            entry,
-            description,
-        }
+        Self { entry, description }
     }
 }
 
