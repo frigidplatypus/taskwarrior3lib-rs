@@ -14,6 +14,29 @@ pub struct Task {
     pub due: Option<DateTime<Utc>>,
 }
 
+impl Task {
+    pub fn new(description: String) -> Self {
+        Task {
+            id: Uuid::new_v4(),
+            description,
+            status: TaskStatus::Pending,
+            entry: Utc::now(),
+            modified: Utc::now(),
+            project: None,
+            priority: None,
+            due: None,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.description.trim().is_empty() {
+            Err("Description cannot be empty".to_string())
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// Task status enumeration
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskStatus {

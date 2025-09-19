@@ -1,45 +1,43 @@
 use anyhow::Result;
 use std::path::PathBuf;
-use taskwarrior3lib::config::Configuration;
-use taskwarrior3lib::hooks::DefaultHookSystem;
-use taskwarrior3lib::storage::TaskChampionStorageBackend;
-use taskwarrior3lib::task::manager::DefaultTaskManager;
+use taskchampion::{Replica, storage::{StorageConfig, AccessMode}};
 
 /// Application configuration and setup
 pub struct App {
-    pub config: Configuration,
-    pub task_manager: DefaultTaskManager,
+    pub replica: Replica,
+    pub data_dir: PathBuf,
 }
 
 impl App {
     /// Create a new application instance with default configuration
     pub fn new() -> Result<Self> {
-        // Use the actual TaskChampion database - this demonstrates real integration
-        // with an existing Taskwarrior installation per FR-001
-        let mut config = Configuration::default();
-        config.data_dir = PathBuf::from("/Users/jmartin/.local/share/task");
-        
-        let storage = Box::new(TaskChampionStorageBackend::with_standard_path());
-        let hooks = Box::new(DefaultHookSystem::new());
-        let task_manager = DefaultTaskManager::new(config.clone(), storage, hooks)?;
-
+        // Use a local data directory for the sample project
+        let data_dir = PathBuf::from("./.taskdata");
+        std::fs::create_dir_all(&data_dir).ok();
+        let storage = StorageConfig::OnDisk {
+            taskdb_dir: data_dir.clone(),
+            create_if_missing: true,
+            access_mode: AccessMode::ReadWrite,
+        }.into_storage()?;
+        let replica = Replica::new(storage);
         Ok(Self {
-            config,
-            task_manager,
+            replica,
+            data_dir,
         })
     }
 
     /// Create a new application instance with custom data directory
     pub fn with_data_dir(data_dir: PathBuf) -> Result<Self> {
-        let mut config = Configuration::from_xdg().unwrap_or_else(|_| Configuration::default());
-        config.data_dir = data_dir.clone();
-        let storage = Box::new(TaskChampionStorageBackend::new(data_dir.join("taskchampion.sqlite3")));
-        let hooks = Box::new(DefaultHookSystem::new());
-        let task_manager = DefaultTaskManager::new(config.clone(), storage, hooks)?;
-
+        std::fs::create_dir_all(&data_dir).ok();
+        let storage = StorageConfig::OnDisk {
+            taskdb_dir: data_dir.clone(),
+            create_if_missing: true,
+            access_mode: AccessMode::ReadWrite,
+        }.into_storage()?;
+        let replica = Replica::new(storage);
         Ok(Self {
-            config,
-            task_manager,
+            replica,
+            data_dir,
         })
     }
 }

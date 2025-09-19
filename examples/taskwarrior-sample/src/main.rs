@@ -1,41 +1,10 @@
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use anyhow::Result;
 use taskwarrior_sample::app::App;
 use taskwarrior_sample::commands::{execute_add, execute_list, execute_done};
 use taskwarrior_sample::models::{AddCommand, ListCommand, DoneCommand, TaskStatus};
-use taskwarrior3lib::TaskManager;
+use taskwarrior_sample::cli::{Cli, Commands};
 use std::process::Command;
-
-#[derive(Parser)]
-#[command(name = "taskwarrior-sample")]
-#[command(about = "Taskwarrior Library Sample CLI")]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    /// Add a new task
-    Add {
-        /// Task description
-        description: String,
-        /// Project name
-        #[arg(short, long)]
-        project: Option<String>,
-    },
-    /// List tasks
-    List,
-    /// Mark task as complete
-    Done {
-        /// Task ID
-        id: String,
-    },
-    /// Import tasks from system Taskwarrior
-    Import,
-    /// Debug information
-    Debug,
-}
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -52,8 +21,8 @@ fn main() -> Result<()> {
                 due: None,
             };
 
-            match execute_add(cmd, &mut app.task_manager) {
-                Ok(task) => println!("Task added successfully (ID: {})", task.id),
+            match execute_add(cmd, &mut app.replica) {
+                 Ok(task) => println!("Task added successfully\nID:{}", task.id),
                 Err(e) => eprintln!("Error: {}", e),
             }
         }
@@ -64,7 +33,7 @@ fn main() -> Result<()> {
                 limit: None,
             };
 
-            match execute_list(cmd, &app.task_manager) {
+            match execute_list(cmd, &mut app.replica) {
                 Ok(tasks) => {
                     if tasks.is_empty() {
                         println!("No tasks found");
@@ -94,13 +63,13 @@ fn main() -> Result<()> {
         Commands::Done { id } => {
             let cmd = DoneCommand { id };
 
-            match execute_done(cmd, &mut app.task_manager) {
+            match execute_done(cmd, &mut app.replica) {
                 Ok(()) => println!("Task marked as completed"),
                 Err(e) => eprintln!("Error: {}", e),
             }
         }
         Commands::Debug => {
-            execute_debug(&app)?;
+            execute_debug(&mut app)?;
         }
         Commands::Import => {
             execute_import(&mut app)?;
@@ -142,15 +111,21 @@ fn execute_import(app: &mut App) -> Result<()> {
 
         for task_data in tasks_to_import {
             if let Some(description) = task_data["description"].as_str() {
-                match app.task_manager.add_task(description.to_string()) {
-                    Ok(_) => {
-                        imported_count += 1;
-                        println!("  ✓ Imported: {}", description);
-                    }
-                    Err(e) => {
-                        println!("  ✗ Failed to import '{}': {}", description, e);
-                    }
+            let mut ops = taskchampion::Operations::new();
+            let uuid = uuid::Uuid::new_v4();
+            let mut task = taskchampion::TaskData::create(uuid, &mut ops);
+            task.update("description", Some(description.to_string()), &mut ops);
+            task.update("status", Some("pending".to_string()), &mut ops);
+            task.update("entry", Some(chrono::Utc::now().to_rfc3339()), &mut ops);
+            match app.replica.commit_operations(ops) {
+                Ok(_) => {
+                    imported_count += 1;
+                    println!("  ✓ Imported: {}", description);
                 }
+                Err(e) => {
+                    println!("  ✗ Failed to import '{}': {}", description, e);
+                }
+            }
             }
         }
 
@@ -163,20 +138,17 @@ fn execute_import(app: &mut App) -> Result<()> {
     Ok(())
 }
 
-fn execute_debug(app: &App) -> Result<()> {
+fn execute_debug(app: &mut App) -> Result<()> {
     println!("=== Taskwarrior Sample Debug Information ===\n");
 
     // Configuration info
     println!("Configuration:");
-    println!("  Data directory: {}", app.config.data_dir.display());
-    println!("  Config file: {}", app.config.config_file.display());
-    println!("  Create dirs: {}", app.config.create_dirs);
-    println!("  Settings: {:?}", app.config.settings);
+    println!("  Data directory: {}", app.data_dir.display());
     println!();
 
     // Data directory contents
     println!("Data directory contents:");
-    match std::fs::read_dir(&app.config.data_dir) {
+    match std::fs::read_dir(&app.data_dir) {
         Ok(entries) => {
             for entry in entries {
                 match entry {
@@ -202,7 +174,7 @@ fn execute_debug(app: &App) -> Result<()> {
         limit: None,
     };
 
-    match execute_list(cmd, &app.task_manager) {
+    match execute_list(cmd, &mut app.replica) {
         Ok(tasks) => {
             println!("  Found {} tasks", tasks.len());
             if !tasks.is_empty() {
@@ -219,8 +191,8 @@ fn execute_debug(app: &App) -> Result<()> {
 
     // Storage backend info
     println!("Storage backend: FileStorageBackend");
-    println!("  Tasks file: {}", app.config.data_dir.join("tasks.json").display());
-    println!("  Backups dir: {}", app.config.data_dir.join("backups").display());
+    println!("  Tasks file: {}", app.data_dir.join("tasks.json").display());
+    println!("  Backups dir: {}", app.data_dir.join("backups").display());
 
     Ok(())
 }

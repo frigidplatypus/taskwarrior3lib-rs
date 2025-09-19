@@ -1,63 +1,64 @@
 use anyhow::Result;
-use taskwarrior3lib::task::{TaskStatus as LibTaskStatus};
-use taskwarrior3lib::task::manager::DefaultTaskManager;
-use taskwarrior3lib::TaskManager;
-use crate::models::{AddCommand, Task};
+use taskchampion::{Replica, Operations, Status, TaskData};
+use uuid::Uuid;
+use chrono::Utc;
+use crate::models::{AddCommand, Task, TaskStatus, TaskPriority};
 
 /// Execute the add command
 pub fn execute_add(
     cmd: AddCommand,
-    task_manager: &mut DefaultTaskManager,
+    replica: &mut Replica,
 ) -> Result<Task> {
-    // Add the task with just the description first
-    let mut added_task = task_manager.add_task(cmd.description.clone())?;
-
-    // If additional fields are provided, update the task
-    if cmd.project.is_some() || cmd.priority.is_some() || cmd.due.is_some() {
-        let mut update = taskwarrior3lib::task::manager::TaskUpdate::new();
-
-        if let Some(project) = cmd.project {
-            update = update.project(project);
-        }
-
-        if let Some(priority_str) = cmd.priority {
-            let priority = match priority_str.to_lowercase().as_str() {
-                "l" | "low" => taskwarrior3lib::task::Priority::Low,
-                "m" | "medium" => taskwarrior3lib::task::Priority::Medium,
-                "h" | "high" => taskwarrior3lib::task::Priority::High,
-                _ => return Err(anyhow::anyhow!("Invalid priority: {}", priority_str)),
-            };
-            update = update.priority(priority);
-        }
-
-        // TODO: Handle due date parsing
-        if cmd.due.is_some() {
-            return Err(anyhow::anyhow!("Due date not yet implemented"));
-        }
-
-        // Apply the updates
-        added_task = task_manager.update_task(added_task.id, update)?;
+    let mut ops = Operations::new();
+    let uuid = Uuid::new_v4();
+    let mut task = TaskData::create(uuid, &mut ops);
+    task.update("description", Some(cmd.description.clone()), &mut ops);
+    task.update("status", Some("pending".to_string()), &mut ops);
+    task.update("entry", Some(Utc::now().to_rfc3339()), &mut ops);
+    if let Some(project) = cmd.project {
+        task.update("project", Some(project), &mut ops);
     }
-
-    // Convert to our local Task model for return
-    let result = Task {
-        id: added_task.id,
-        description: added_task.description,
-        status: match added_task.status {
-            LibTaskStatus::Pending => crate::models::TaskStatus::Pending,
-            LibTaskStatus::Completed => crate::models::TaskStatus::Completed,
-            _ => crate::models::TaskStatus::Pending, // Default fallback
-        },
-        entry: added_task.entry,
-        modified: added_task.modified.unwrap_or(added_task.entry),
-        project: added_task.project,
-        priority: added_task.priority.map(|p| match p {
-            taskwarrior3lib::task::Priority::Low => crate::models::TaskPriority::Low,
-            taskwarrior3lib::task::Priority::Medium => crate::models::TaskPriority::Medium,
-            taskwarrior3lib::task::Priority::High => crate::models::TaskPriority::High,
-        }),
-        due: added_task.due,
+    if let Some(priority_str) = cmd.priority {
+        let priority = match priority_str.to_lowercase().as_str() {
+            "l" | "low" => "L",
+            "m" | "medium" => "M",
+            "h" | "high" => "H",
+            _ => return Err(anyhow::anyhow!("Invalid priority: {}", priority_str)),
+        };
+        task.update("priority", Some(priority.to_string()), &mut ops);
+    }
+    // TODO: Handle due date parsing
+    // if let Some(due_str) = cmd.due {
+    //     // Parse and set due date
+    // }
+    replica.commit_operations(ops)?;
+    // Read back the task for display
+    let all_tasks = replica.all_task_data()?;
+    let task_data = all_tasks.get(&uuid).ok_or_else(|| anyhow::anyhow!("Task not found after add"))?;
+    let description = task_data.get("description").map(|s| s.to_string()).unwrap_or_default();
+    let status = match task_data.get("status") {
+        Some("pending") => TaskStatus::Pending,
+        Some("completed") => TaskStatus::Completed,
+        _ => TaskStatus::Pending,
     };
-
-    Ok(result)
+    let entry = task_data.get("entry").and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map(|dt| dt.with_timezone(&Utc)).unwrap_or_else(Utc::now);
+    let modified = entry;
+    let project = task_data.get("project").map(|s| s.to_string());
+    let priority = match task_data.get("priority") {
+        Some("L") => Some(TaskPriority::Low),
+        Some("M") => Some(TaskPriority::Medium),
+        Some("H") => Some(TaskPriority::High),
+        _ => None,
+    };
+    let due = None; // TODO: parse due
+    Ok(Task {
+        id: uuid,
+        description,
+        status,
+        entry,
+        modified,
+        project,
+        priority,
+        due,
+    })
 }

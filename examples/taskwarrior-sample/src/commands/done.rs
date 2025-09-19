@@ -1,28 +1,18 @@
 use anyhow::Result;
 use uuid::Uuid;
-use taskwarrior3lib::task::{TaskStatus as LibTaskStatus};
-use taskwarrior3lib::task::manager::{DefaultTaskManager, TaskUpdate};
-use taskwarrior3lib::TaskManager;
+use taskchampion::{Replica, Operations};
 
 /// Execute the done command
 pub fn execute_done(
     cmd: crate::models::DoneCommand,
-    task_manager: &mut DefaultTaskManager,
+    replica: &mut Replica,
 ) -> Result<()> {
-    // Parse the task ID
-    let task_id = Uuid::parse_str(&cmd.id)
+    let uuid = Uuid::parse_str(&cmd.id)
         .map_err(|_| anyhow::anyhow!("Invalid task ID format: {}", cmd.id))?;
-
-    // Get the existing task
-    let _task = task_manager
-        .get_task(task_id)?
-        .ok_or_else(|| anyhow::anyhow!("Task not found: {}", cmd.id))?;
-
-    // Build the update to mark task as completed
-    let update = TaskUpdate::new().status(LibTaskStatus::Completed);
-
-    // Update the task
-    task_manager.update_task(task_id, update)?;
-
+    let mut ops = Operations::new();
+    let mut all_tasks = replica.all_task_data()?;
+    let task_data = all_tasks.get_mut(&uuid).ok_or_else(|| anyhow::anyhow!("Task not found: {}", cmd.id))?;
+    task_data.update("status", Some("completed".to_string()), &mut ops);
+    replica.commit_operations(ops)?;
     Ok(())
 }

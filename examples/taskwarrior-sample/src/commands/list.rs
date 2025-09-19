@@ -1,60 +1,58 @@
 use anyhow::Result;
-use taskwarrior3lib::query::TaskQueryBuilder;
-use taskwarrior3lib::task::{TaskStatus as LibTaskStatus};
-use taskwarrior3lib::task::manager::DefaultTaskManager;
-use taskwarrior3lib::TaskManager;
-use crate::models::{ListCommand, Task, TaskStatus};
+use taskchampion::Replica;
+use crate::models::{ListCommand, Task, TaskStatus, TaskPriority};
+use chrono::Utc;
 
 /// Execute the list command
 pub fn execute_list(
     cmd: ListCommand,
-    task_manager: &DefaultTaskManager,
+    replica: &mut Replica,
 ) -> Result<Vec<Task>> {
-    // Build query based on command parameters
-    let mut query_builder = taskwarrior3lib::query::TaskQueryBuilderImpl::new();
-
-    // Set status filter
-    if let Some(status) = cmd.status {
-        let lib_status = match status {
-            TaskStatus::Pending => LibTaskStatus::Pending,
-            TaskStatus::Completed => LibTaskStatus::Completed,
+    let mut tasks = Vec::new();
+    let all_tasks = replica.all_task_data()?;
+    for (uuid, task_data) in all_tasks {
+        // Status filter
+        let status = match task_data.get("status") {
+            Some("pending") => TaskStatus::Pending,
+            Some("completed") => TaskStatus::Completed,
+            _ => TaskStatus::Pending,
         };
-        query_builder = query_builder.status(lib_status);
+        if let Some(ref filter_status) = cmd.status {
+            if status != *filter_status {
+                continue;
+            }
+        }
+        // Project filter
+        let project = task_data.get("project").map(|s| s.to_string());
+        if let Some(ref filter_project) = cmd.project {
+            if project.as_deref() != Some(filter_project) {
+                continue;
+            }
+        }
+        let description = task_data.get("description").map(|s| s.to_string()).unwrap_or_default();
+        let entry = task_data.get("entry").and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map(|dt| dt.with_timezone(&Utc)).unwrap_or_else(Utc::now);
+        let modified = entry;
+        let priority = match task_data.get("priority") {
+            Some("L") => Some(TaskPriority::Low),
+            Some("M") => Some(TaskPriority::Medium),
+            Some("H") => Some(TaskPriority::High),
+            _ => None,
+        };
+        let due = None; // TODO: parse due
+        tasks.push(Task {
+            id: uuid,
+            description,
+            status,
+            entry,
+            modified,
+            project,
+            priority,
+            due,
+        });
     }
-
-    // Set project filter
-    if let Some(project) = cmd.project {
-        query_builder = query_builder.project(project);
+    // Apply limit if specified
+    if let Some(limit) = cmd.limit {
+        tasks.truncate(limit);
     }
-
-    // Build the query
-    let query = query_builder.build()?;
-
-    // Execute the query
-    let lib_tasks = task_manager.query_tasks(&query)?;
-
-    // Convert to our local Task model
-    let tasks = lib_tasks
-        .into_iter()
-        .map(|lib_task| Task {
-            id: lib_task.id,
-            description: lib_task.description,
-            status: match lib_task.status {
-                LibTaskStatus::Pending => TaskStatus::Pending,
-                LibTaskStatus::Completed => TaskStatus::Completed,
-                _ => TaskStatus::Pending,
-            },
-            entry: lib_task.entry,
-            modified: lib_task.modified.unwrap_or(lib_task.entry),
-            project: lib_task.project,
-            priority: lib_task.priority.map(|p| match p {
-                taskwarrior3lib::task::Priority::Low => crate::models::TaskPriority::Low,
-                taskwarrior3lib::task::Priority::Medium => crate::models::TaskPriority::Medium,
-                taskwarrior3lib::task::Priority::High => crate::models::TaskPriority::High,
-            }),
-            due: lib_task.due,
-        })
-        .collect();
-
     Ok(tasks)
 }
