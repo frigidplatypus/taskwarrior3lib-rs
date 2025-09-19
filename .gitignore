@@ -15,6 +15,9 @@ devenv.local.nix
 # Build output
 /target/
 
+# Sample CLI data directory
+/examples/taskwarrior-sample/.taskdata/
+
 # If you want to avoid checking in Cargo.lock (libraries should, binaries may)
 # Cargo.lock
 

@@ -2,6 +2,29 @@
 
 A Rust library providing idiomatic access to Taskwarrior 3.x functionality with TaskChampion backend integration, following Rust conventions and integrating with local Taskwarrior installations.
 
+---
+
+## Getting Started
+See [GETTING_STARTED.md](./GETTING_STARTED.md) for setup, sample usage, and onboarding.
+
+## Sample CLI
+Try the sample CLI in [examples/taskwarrior-sample/README.md](./examples/taskwarrior-sample/README.md).
+
+## Feature Specs
+Explore feature specifications and plans in [specs/](./specs/).
+
+## Documentation
+See [docs/](./docs/) for advanced usage, troubleshooting, and AI/LLM guides.
+
+## Contributing
+We welcome contributions!
+- Fork the repo and create a feature branch.
+- Make your changes and add tests.
+- Run `cargo test` to ensure all tests pass.
+- Submit a pull request with a clear description.
+
+---
+
 ## Features
 
 - **Idiomatic Rust**: Uses Result<T, E>, builder patterns, traits, and proper error handling
