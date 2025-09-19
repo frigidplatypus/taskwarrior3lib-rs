@@ -2,7 +2,7 @@
 //!
 //! These tests validate that all components work together correctly.
 
-use taskwarriorlib::{
+use taskwarrior3lib::{
     config::ConfigurationBuilder,
     hooks::DefaultHookSystem,
     query::{TaskQueryBuilder, TaskQueryBuilderImpl},

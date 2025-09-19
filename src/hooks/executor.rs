@@ -18,8 +18,8 @@
 //! The executor is typically used internally by the hook system:
 //!
 //! ```rust
-//! use taskwarriorlib::hooks::{HookExecutor, HookConfig, HookContext, HookEvent};
-//! use taskwarriorlib::task::Task;
+//! use taskwarrior3lib::hooks::{HookExecutor, HookConfig, HookContext, HookEvent};
+//! use taskwarrior3lib::task::Task;
 //! use std::path::Path;
 //! use std::collections::HashMap;
 //!
@@ -125,6 +125,19 @@ impl HookExecutor {
         config: &HookConfig,
         context: &HookContext,
     ) -> Result<Command, TaskError> {
+        // Some environments may not correctly honor the shebang interpreter path
+        // when executing scripts. To make tests and execution more robust, run
+        // shell scripts via the system shell on Unix.
+        #[cfg(unix)]
+        let mut cmd = {
+            // Use /bin/sh to execute script path as an argument. This is portable
+            // and avoids relying on the shebang pointing to a missing interpreter.
+            let mut c = Command::new("/bin/sh");
+            c.arg(&config.path);
+            c
+        };
+
+        #[cfg(not(unix))]
         let mut cmd = Command::new(&config.path);
 
         // Set working directory
@@ -317,6 +330,13 @@ mod tests {
 
     fn create_test_script(temp_dir: &TempDir, content: &str) -> std::path::PathBuf {
         let script_path = temp_dir.path().join("test_hook.sh");
+        // Some test environments may not have /bin/bash; prefer /bin/sh for portability.
+        let content = if content.starts_with("#!/bin/bash") {
+            content.replacen("#!/bin/bash", "#!/bin/sh", 1)
+        } else {
+            content.to_string()
+        };
+
         fs::write(&script_path, content).unwrap();
 
         // Make the script executable

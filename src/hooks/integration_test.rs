@@ -23,6 +23,13 @@ mod tests {
         content: &str,
     ) -> std::path::PathBuf {
         let script_path = dir.join(name);
+        // Prefer /bin/sh for portability in test environments where /bin/bash may be absent
+        let content = if content.starts_with("#!/bin/bash") {
+            content.replacen("#!/bin/bash", "#!/bin/sh", 1)
+        } else {
+            content.to_string()
+        };
+
         fs::write(&script_path, content).unwrap();
 
         #[cfg(unix)]

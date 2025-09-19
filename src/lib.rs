@@ -18,11 +18,14 @@
 //! ## Quick Start
 //!
 //! ```rust
-//! use taskwarriorlib::{Configuration, TaskManager};
-//! use taskwarriorlib::storage::TaskChampionStorageBackend;
-//! use taskwarriorlib::hooks::DefaultHookSystem;
-//! use taskwarriorlib::task::manager::DefaultTaskManager;
-//! use taskwarriorlib::query::TaskQueryBuilderImpl;
+//! use taskwarrior3lib::{Configuration, TaskManager};
+//! use taskwarrior3lib::storage::TaskChampionStorageBackend;
+//! use taskwarrior3lib::hooks::DefaultHookSystem;
+//! use taskwarrior3lib::task::manager::DefaultTaskManager;
+//! use taskwarrior3lib::query::TaskQueryBuilderImpl;
+//! use taskwarrior3lib::TaskStatus;
+//! // Import the builder trait so `.new()` is available
+//! use taskwarrior3lib::TaskQueryBuilder;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Connect to actual Taskwarrior database

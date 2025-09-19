@@ -16,7 +16,7 @@
 //! ## Quick Example
 //!
 //! ```rust
-//! use taskwarriorlib::hooks::{DefaultHookSystem, HookSystem};
+//! use taskwarrior3lib::hooks::{DefaultHookSystem, HookSystem};
 //! # use tempfile::TempDir;
 //! # use std::fs;
 //!

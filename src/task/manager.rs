@@ -16,10 +16,47 @@ use crate::sync::SyncManager;
 use crate::task::model::UdaValue;
 use crate::task::{Task, TaskStatus};
 
+/// Minimal ProjectFilter definition to avoid corrupted filter.rs
+#[derive(Debug, Clone, PartialEq)]
+pub enum SimpleProjectFilter {
+    Equals(String),
+}
+
+/// Extract a simple project:<name> token from a Taskwarrior filter expression
+fn parse_project_from_context_filter(filter: &str) -> Option<SimpleProjectFilter> {
+    for token in filter.split_whitespace() {
+        if let Some(rest) = token.strip_prefix("project:") {
+            return Some(SimpleProjectFilter::Equals(rest.trim_matches('"').trim_matches('\'').to_string()));
+        }
+        if token.starts_with("project==") || token.starts_with("project=") {
+            let mut val = token;
+            if let Some(pos) = token.find('=') { 
+                val = &token[pos + 1..]; 
+            }
+            let v = val.trim_matches('"').trim_matches('\'');
+            if !v.is_empty() { 
+                return Some(SimpleProjectFilter::Equals(v.to_string())); 
+            }
+        }
+    }
+    None
+}
+
 /// Main task management interface
 pub trait TaskManager: ConfigurationProvider {
     /// Add a new task
     fn add_task(&mut self, description: String) -> Result<Task, TaskError>;
+
+    /// Add a new task with options controlling context behavior
+    fn add_task_with_options(
+        &mut self,
+        description: String,
+        options: AddOptions,
+    ) -> Result<Task, TaskError> {
+        // Default implementation forwards to add_task, ignoring options.
+        // Implementations may override to honor options.
+        self.add_task(description)
+    }
 
     /// Get a task by ID
     fn get_task(&self, id: Uuid) -> Result<Option<Task>, TaskError>;
@@ -303,7 +340,33 @@ impl ConfigurationProvider for DefaultTaskManager {
 
 impl TaskManager for DefaultTaskManager {
     fn add_task(&mut self, description: String) -> Result<Task, TaskError> {
-        let task = Task::new(description);
+        // Default behavior: use CombineWithContext semantics
+        let options = AddOptions::default();
+        self.add_task_with_options(description, options)
+    }
+
+    fn add_task_with_options(
+        &mut self,
+        description: String,
+        options: AddOptions,
+    ) -> Result<Task, TaskError> {
+        let mut task = Task::new(description);
+
+        // Apply active context write defaults if present and not ignored.
+        // For now we only support a simple project:<name> write default.
+        let apply_context = !matches!(options.filter_mode, Some(crate::query::FilterMode::IgnoreContext));
+        if apply_context {
+            let contexts = self.config.discover_contexts()?;
+            if let Some(active) = contexts.into_iter().find(|c| c.active) {
+                if let Some(write) = active.write_filter.as_deref() {
+                    if let Some(proj) = crate::storage::parse_project_from_filter(write) {
+                        if task.project.is_none() {
+                            task.project = Some(proj);
+                        }
+                    }
+                }
+            }
+        }
 
         // Validate task
         self.validate_task(&task)
@@ -386,7 +449,49 @@ impl TaskManager for DefaultTaskManager {
     }
 
     fn query_tasks(&self, query: &TaskQuery) -> Result<Vec<Task>, TaskError> {
-        self.storage.query_tasks(query)
+        // Discover active context and pass it to storage backends. If
+        // no context is active, pass None. Default behavior is to honor
+        // the active context unless the query's filter_mode requests
+        // ignoring it.
+        let contexts = self.config.discover_contexts()?;
+        let active = contexts.into_iter().find(|c| c.active);
+        
+        // If there's an active context and the query does not explicitly
+        // ignore it, compose the context read_filter into the query.
+        let effective_query = if let Some(ctx) = active.as_ref() {
+            use crate::query::FilterMode;
+            let ignore = matches!(query.filter_mode, Some(FilterMode::IgnoreContext));
+            if !ignore {
+                // Attempt to parse a simple project token from the context read filter
+                if query.project_filter.is_none() {
+                    if let Some(proj) = parse_project_from_context_filter(&ctx.read_filter) {
+                        // Convert our SimpleProjectFilter to the query ProjectFilter
+                        let mut q = query.clone();
+                        match proj {
+                            SimpleProjectFilter::Equals(name) => {
+                                q.project_filter = Some(crate::query::ProjectFilter::Equals(name));
+                            }
+                        }
+                        Some(q)
+                    } else {
+                        None
+                    }
+                } else {
+                    // Query already has a project_filter; leave composition to later (or storage)
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if let Some(q) = effective_query {
+            self.storage.query_tasks(&q, None)
+        } else {
+            self.storage.query_tasks(query, active.as_ref())
+        }
     }
 
     fn pending_tasks(&self) -> Result<Vec<Task>, TaskError> {
@@ -398,6 +503,7 @@ impl TaskManager for DefaultTaskManager {
             sort: None,
             limit: None,
             offset: None,
+            filter_mode: None,
         };
         self.query_tasks(&query)
     }
@@ -411,6 +517,7 @@ impl TaskManager for DefaultTaskManager {
             sort: None,
             limit: None,
             offset: None,
+            filter_mode: None,
         };
         self.query_tasks(&query)
     }
@@ -455,6 +562,14 @@ impl TaskManager for DefaultTaskManager {
             errors,
         })
     }
+}
+
+/// Options to control behavior when adding/creating a task
+#[derive(Debug, Clone, Default)]
+pub struct AddOptions {
+    /// How to treat any active Taskwarrior context's write_filter when
+    /// creating a new task. None uses the default behavior (combine/apply).
+    pub filter_mode: Option<crate::query::FilterMode>,
 }
 
 /// Builder for TaskManager

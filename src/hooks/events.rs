@@ -35,8 +35,8 @@
 //! The [`HookContext`] provides task data and metadata to hook scripts:
 //!
 //! ```rust
-//! use taskwarriorlib::hooks::{HookContext, HookEvent};
-//! use taskwarriorlib::task::Task;
+//! use taskwarrior3lib::hooks::{HookContext, HookEvent};
+//! use taskwarrior3lib::task::Task;
 //! use std::collections::HashMap;
 //!
 //! let task = Task::new("Example task".to_string());
@@ -50,7 +50,7 @@
 //! directly when implementing custom hook systems:
 //!
 //! ```rust
-//! use taskwarriorlib::hooks::{HookEvent, HookContext};
+//! use taskwarrior3lib::hooks::{HookEvent, HookContext};
 //!
 //! // Check if event allows abortion (pre events can abort)
 //! let event = HookEvent::PreAdd;

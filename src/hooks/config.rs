@@ -33,7 +33,7 @@
 //! Use the API to configure hooks in code:
 //!
 //! ```rust
-//! use taskwarriorlib::hooks::{HookConfig, HookEvent};
+//! use taskwarrior3lib::hooks::{HookConfig, HookEvent};
 //! use std::path::Path;
 //!
 //! // Create a HookConfig for a discovered script

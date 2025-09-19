@@ -240,7 +240,11 @@ impl StorageBackend for TaskChampionStorageBackend {
         Ok(tasks)
     }
 
-    fn query_tasks(&self, query: &TaskQuery) -> Result<Vec<Task>, TaskError> {
+    fn query_tasks(
+        &self,
+        query: &TaskQuery,
+        active_context: Option<&crate::config::context::UserContext>,
+    ) -> Result<Vec<Task>, TaskError> {
         let mut tasks = self.load_all_tasks()?;
 
         // Apply filters (simplified implementation)
@@ -254,7 +258,7 @@ impl StorageBackend for TaskChampionStorageBackend {
 
             // Project filter
             if let Some(project_filter) = &query.project_filter {
-                use crate::query::filter::ProjectFilter;
+                use crate::query::ProjectFilter;
                 match project_filter {
                     ProjectFilter::Equals(project) | ProjectFilter::Exact(project) => {
                         if task.project.as_ref() != Some(project) {
@@ -262,6 +266,19 @@ impl StorageBackend for TaskChampionStorageBackend {
                         }
                     }
                     _ => {} // TODO: Implement other project filters
+                }
+            }
+
+            // Active context (AND) unless explicitly ignored
+            if let Some(ctx) = active_context {
+                use crate::query::FilterMode;
+                let ignore = matches!(query.filter_mode, Some(FilterMode::IgnoreContext));
+                if !ignore {
+                    if let Some(proj) = crate::storage::parse_project_from_filter(&ctx.read_filter) {
+                        if task.project.as_deref() != Some(proj.as_str()) {
+                            return false;
+                        }
+                    }
                 }
             }
 

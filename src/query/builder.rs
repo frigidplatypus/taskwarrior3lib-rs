@@ -18,6 +18,7 @@ pub struct TaskQueryBuilderImpl {
     sort: Option<SortCriteria>,
     limit: Option<usize>,
     offset: Option<usize>,
+    filter_mode: Option<crate::query::FilterMode>,
 }
 
 /// TaskQueryBuilder trait definition
@@ -29,6 +30,7 @@ pub trait TaskQueryBuilder {
     fn due_before(self, date: DateTime<Utc>) -> Self;
     fn due_after(self, date: DateTime<Utc>) -> Self;
     fn sort_by_priority(self) -> Self;
+    fn filter_mode(self, mode: crate::query::FilterMode) -> Self;
     fn limit(self, limit: usize) -> Self;
     fn offset(self, offset: usize) -> Self;
     fn build(self) -> Result<TaskQuery, QueryError>;
@@ -69,6 +71,11 @@ impl TaskQueryBuilder for TaskQueryBuilderImpl {
         self
     }
 
+    fn filter_mode(mut self, mode: crate::query::FilterMode) -> Self {
+        self.filter_mode = Some(mode);
+        self
+    }
+
     fn limit(mut self, limit: usize) -> Self {
         self.limit = Some(limit);
         self
@@ -84,7 +91,7 @@ impl TaskQueryBuilder for TaskQueryBuilderImpl {
         if self.limit == Some(0) {
             return Err(QueryError::InvalidLimit);
         }
-
+        // default filter_mode is None (up to caller to interpret), keep optional
         Ok(TaskQuery {
             status: self.status,
             project_filter: self.project_filter,
@@ -93,9 +100,12 @@ impl TaskQueryBuilder for TaskQueryBuilderImpl {
             sort: self.sort,
             limit: self.limit,
             offset: self.offset,
+            filter_mode: self.filter_mode,
         })
     }
 }
+
+// (No duplicate impl - all TaskQueryBuilder methods are implemented above.)
 
 /// Query builder trait for extensibility
 pub trait QueryBuilder {

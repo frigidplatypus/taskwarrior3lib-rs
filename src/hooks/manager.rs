@@ -21,8 +21,8 @@
 //! ## Usage
 //!
 //! ```rust
-//! use taskwarriorlib::hooks::{DefaultHookManager, HookConfig, HookEvent, HookContext, HookManager};
-//! use taskwarriorlib::task::Task;
+//! use taskwarrior3lib::hooks::{DefaultHookManager, HookConfig, HookEvent, HookContext, HookManager};
+//! use taskwarrior3lib::task::Task;
 //! use std::path::Path;
 //!
 //! // Create hook manager

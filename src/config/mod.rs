@@ -4,6 +4,7 @@
 //! following XDG Base Directory specification and Taskwarrior conventions.
 
 pub mod discovery;
+pub mod context;
 
 use crate::error::{ConfigError, TaskError};
 use discovery::discover_all_paths;
@@ -109,6 +110,11 @@ impl Configuration {
     /// Get a configuration value
     pub fn get(&self, key: &str) -> Option<&String> {
         self.settings.get(key)
+    }
+
+    /// Discover contexts from current settings
+    pub fn discover_contexts(&self) -> Result<Vec<context::UserContext>, ConfigError> {
+        Ok(context::discover_contexts(&self.settings)?)
     }
 
     /// Get a configuration value with default

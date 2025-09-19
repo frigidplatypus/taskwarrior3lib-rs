@@ -37,8 +37,14 @@ pub trait StorageBackend: std::fmt::Debug {
     /// Load all tasks
     fn load_all_tasks(&self) -> Result<Vec<Task>, TaskError>;
 
-    /// Query tasks with filters
-    fn query_tasks(&self, query: &TaskQuery) -> Result<Vec<Task>, TaskError>;
+    /// Query tasks with filters. The optional active_context is the
+    /// currently active Taskwarrior context (if any) and may be used by
+    /// backends to combine context read filters with the explicit query.
+    fn query_tasks(
+        &self,
+        query: &TaskQuery,
+        active_context: Option<&crate::config::context::UserContext>,
+    ) -> Result<Vec<Task>, TaskError>;
 
     /// Backup storage
     fn backup(&self) -> Result<String, StorageError>;
@@ -193,7 +199,12 @@ impl FileStorageBackend {
     }
 
     /// Apply query filters to task collection
-    fn filter_tasks(&self, tasks: &HashMap<Uuid, Task>, query: &TaskQuery) -> Vec<Task> {
+    fn filter_tasks(
+        &self,
+        tasks: &HashMap<Uuid, Task>,
+        query: &TaskQuery,
+        active_context: Option<&crate::config::context::UserContext>,
+    ) -> Vec<Task> {
         let mut filtered: Vec<Task> = tasks
             .values()
             .filter(|task| {
@@ -206,7 +217,7 @@ impl FileStorageBackend {
 
                 // Project filter
                 if let Some(project_filter) = &query.project_filter {
-                    use crate::query::filter::ProjectFilter;
+                    use crate::query::ProjectFilter;
                     match project_filter {
                         ProjectFilter::Equals(project) | ProjectFilter::Exact(project) => {
                             if task.project.as_ref() != Some(project) {
@@ -249,6 +260,22 @@ impl FileStorageBackend {
                 // Date filter (simplified implementation)
                 if let Some(_date_filter) = &query.date_filter {
                     // TODO: Implement date filtering when needed
+                }
+
+                // If there's an active context and the query does not explicitly
+                // ignore it, attempt to apply the context read filter as an
+                // additional constraint. For now we only support a simple
+                // project:<name> read filter token.
+                if let Some(ctx) = active_context {
+                    use crate::query::FilterMode;
+                    let ignore = matches!(query.filter_mode, Some(FilterMode::IgnoreContext));
+                    if !ignore {
+                        if let Some(proj) = parse_project_from_filter(&ctx.read_filter) {
+                            if task.project.as_ref() != Some(&proj) {
+                                return false;
+                            }
+                        }
+                    }
                 }
 
                 true
@@ -333,6 +360,24 @@ impl FileStorageBackend {
 
         filtered.into_iter().skip(start).take(end - start).collect()
     }
+}
+
+/// Very small parser to extract a project:<name> token from a Taskwarrior
+/// filter expression. Returns Some(name) if found, else None. This is a
+/// pragmatic short-term implementation; full filter parsing will be added
+/// later.
+pub(crate) fn parse_project_from_filter(filter: &str) -> Option<String> {
+    for token in filter.split_whitespace() {
+        if let Some(rest) = token.strip_prefix("project:") {
+            return Some(rest.to_string());
+        }
+        // support project=='Name' or project:"Name"
+        if token.starts_with("project=") {
+            let val = token.trim_start_matches("project=").trim_matches('"').trim_matches('\'');
+            return Some(val.to_string());
+        }
+    }
+    None
 }
 
 impl Default for FileStorageBackend {
@@ -429,14 +474,18 @@ impl StorageBackend for FileStorageBackend {
         Ok(cache.values().cloned().collect())
     }
 
-    fn query_tasks(&self, query: &TaskQuery) -> Result<Vec<Task>, TaskError> {
+    fn query_tasks(
+        &self,
+        query: &TaskQuery,
+        active_context: Option<&crate::config::context::UserContext>,
+    ) -> Result<Vec<Task>, TaskError> {
         let tasks = if !self.initialized {
             self.load_tasks_from_file()?
         } else {
             self.task_cache.lock().unwrap().clone()
         };
 
-        Ok(self.filter_tasks(&tasks, query))
+        Ok(self.filter_tasks(&tasks, query, active_context))
     }
 
     fn backup(&self) -> Result<String, StorageError> {
