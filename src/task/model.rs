@@ -58,6 +58,11 @@ pub struct Task {
     #[serde(rename = "uuid")]
     pub id: Uuid,
 
+    /// Transient display id (CLI working_set index). Present only for CLI/display contexts.
+    /// Serialized as "id" when present to match Taskwarrior export shape.
+    #[serde(rename = "id", skip_serializing_if = "Option::is_none", default)]
+    pub display_id: Option<u32>,
+
     /// Task description (required)
     pub description: String,
 
@@ -131,6 +136,7 @@ impl Task {
     pub fn new(description: String) -> Self {
         Self {
             id: Uuid::new_v4(),
+            display_id: None,
             description,
             status: TaskStatus::Pending,
             entry: Utc::now(),

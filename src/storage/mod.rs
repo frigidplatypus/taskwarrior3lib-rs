@@ -5,6 +5,9 @@
 
 pub mod serialization;
 pub mod taskchampion;
+pub mod operation_batch;
+pub mod replica_wrapper;
+pub mod replica_taskchampion;
 
 pub use taskchampion::TaskChampionStorageBackend;
 

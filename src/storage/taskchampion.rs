@@ -14,9 +14,18 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 /// TaskChampion storage backend for reading Taskwarrior's SQLite database
-#[derive(Debug)]
 pub struct TaskChampionStorageBackend {
     db_path: PathBuf,
+    // Optional injected replica wrapper for commit operations (testable)
+    replica: Option<Box<dyn crate::storage::replica_wrapper::ReplicaWrapper>>,
+}
+
+impl std::fmt::Debug for TaskChampionStorageBackend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TaskChampionStorageBackend")
+            .field("db_path", &self.db_path)
+            .finish()
+    }
 }
 
 impl TaskChampionStorageBackend {
@@ -24,6 +33,7 @@ impl TaskChampionStorageBackend {
     pub fn new<P: Into<PathBuf>>(db_path: P) -> Self {
         Self {
             db_path: db_path.into(),
+            replica: None,
         }
     }
 
@@ -45,9 +55,14 @@ impl TaskChampionStorageBackend {
     fn open_connection(&self) -> Result<Connection, TaskError> {
         Connection::open(&self.db_path).map_err(|e| TaskError::Storage {
             source: StorageError::Database {
-                message: format!("Failed to open TaskChampion database: {}", e),
+                message: format!("Failed to open TaskChampion database: {e}"),
             },
         })
+    }
+
+    /// Inject a replica wrapper (used by tests to mock commits).
+    pub fn set_replica(&mut self, replica: Box<dyn crate::storage::replica_wrapper::ReplicaWrapper>) {
+        self.replica = Some(replica);
     }
 
     /// Convert database row to Task
@@ -123,6 +138,7 @@ impl TaskChampionStorageBackend {
 
         Ok(Task {
             id: uuid,
+            display_id: None,
             description,
             status,
             entry,
@@ -167,13 +183,30 @@ impl StorageBackend for TaskChampionStorageBackend {
     }
 
     fn save_task(&mut self, _task: &Task) -> Result<(), TaskError> {
-        // TaskChampion is read-only for now
-        // In a full implementation, this would use TaskChampion's sync protocol
-        Err(TaskError::Storage {
-            source: StorageError::Database {
-                message: "TaskChampion backend is read-only. Use Taskwarrior CLI for modifications.".to_string(),
-            },
-        })
+        // Build operation batch for the task
+        use crate::storage::operation_batch::{build_save_batch};
+
+        // If a replica wrapper is injected (tests), avoid touching the DB schema
+        // and assume no existing task unless we can read it via the replica.
+        let existing = if let Some(replica) = &self.replica {
+            // Use replica's read_task if available
+            replica.read_task(_task.id).unwrap_or_default()
+        } else {
+            self.load_task(_task.id)?
+        };
+
+        let ops = build_save_batch(existing.as_ref(), _task);
+
+        if let Some(replica) = &mut self.replica {
+            replica.commit_operations(&ops).map_err(|e| TaskError::Storage { source: StorageError::Database { message: format!("Failed to commit operations: {e}") } })?;
+            Ok(())
+        } else {
+            Err(TaskError::Storage {
+                source: StorageError::Database {
+                    message: "TaskChampion write path not configured: no ReplicaWrapper injected".to_string(),
+                },
+            })
+        }
     }
 
     fn load_task(&self, id: Uuid) -> Result<Option<Task>, TaskError> {
@@ -181,17 +214,17 @@ impl StorageBackend for TaskChampionStorageBackend {
         
         let mut stmt = conn.prepare(
             "SELECT uuid, data FROM tasks WHERE uuid = ?1"
-        ).map_err(|e| TaskError::Storage {
-            source: StorageError::Database {
-                message: format!("Failed to prepare query: {}", e),
-            },
-        })?;
+            ).map_err(|e| TaskError::Storage {
+                source: StorageError::Database {
+                    message: format!("Failed to prepare query: {e}"),
+                },
+            })?;
 
         let task = stmt.query_row([id.to_string()], |row| self.row_to_task(row))
             .optional()
             .map_err(|e| TaskError::Storage {
                 source: StorageError::Database {
-                    message: format!("Failed to query task: {}", e),
+                    message: format!("Failed to query task: {e}"),
                 },
             })?;
 
@@ -199,12 +232,20 @@ impl StorageBackend for TaskChampionStorageBackend {
     }
 
     fn delete_task(&mut self, _id: Uuid) -> Result<(), TaskError> {
-        // TaskChampion is read-only for now
-        Err(TaskError::Storage {
-            source: StorageError::Database {
-                message: "TaskChampion backend is read-only. Use Taskwarrior CLI for modifications.".to_string(),
-            },
-        })
+        use crate::storage::operation_batch::build_delete_batch;
+
+        let ops = build_delete_batch(_id);
+
+        if let Some(replica) = &mut self.replica {
+            replica.commit_operations(&ops).map_err(|e| TaskError::Storage { source: StorageError::Database { message: format!("Failed to commit operations: {e}") } })?;
+            Ok(())
+        } else {
+            Err(TaskError::Storage {
+                source: StorageError::Database {
+                    message: "TaskChampion write path not configured: no ReplicaWrapper injected".to_string(),
+                },
+            })
+        }
     }
 
     fn load_all_tasks(&self) -> Result<Vec<Task>, TaskError> {
@@ -212,16 +253,16 @@ impl StorageBackend for TaskChampionStorageBackend {
         
         let mut stmt = conn.prepare(
             "SELECT uuid, data FROM tasks"
-        ).map_err(|e| TaskError::Storage {
-            source: StorageError::Database {
-                message: format!("Failed to prepare query: {}", e),
-            },
-        })?;
+            ).map_err(|e| TaskError::Storage {
+                source: StorageError::Database {
+                    message: format!("Failed to prepare query: {e}"),
+                },
+            })?;
 
         let task_iter = stmt.query_map([], |row| self.row_to_task(row))
             .map_err(|e| TaskError::Storage {
                 source: StorageError::Database {
-                    message: format!("Failed to query tasks: {}", e),
+                    message: format!("Failed to query tasks: {e}"),
                 },
             })?;
 
@@ -231,7 +272,7 @@ impl StorageBackend for TaskChampionStorageBackend {
                 Ok(task) => tasks.push(task),
                 Err(e) => return Err(TaskError::Storage {
                     source: StorageError::Database {
-                        message: format!("Failed to parse task: {}", e),
+                        message: format!("Failed to parse task: {e}"),
                     },
                 }),
             }

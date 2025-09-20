@@ -48,13 +48,13 @@ pub fn discover_contexts(settings: &HashMap<String, String>) -> Result<Vec<UserC
 
                 // v is the read filter expression; Taskwarrior supports a separate write
                 // filter via `context.<name>.write` in newer versions; attempt to read it
-                let write_key = format!("context.{}.write", name);
+                let write_key = format!("context.{name}.write");
                 let write_filter = settings.get(&write_key).cloned();
 
                 // Basic validation: read filter must be non-empty
                 if v.trim().is_empty() {
                     return Err(ConfigError::InvalidValue {
-                        key: format!("context.{}", name),
+                        key: format!("context.{name}"),
                         value: v.clone(),
                         expected: "non-empty filter expression".to_string(),
                     });
@@ -158,8 +158,8 @@ fn write_context_setting(path: &Path, value: Option<&str>) -> Result<(), ConfigE
     });
 
     // Append new context line if setting a value
-    if let Some(name) = value {
-        lines.push(format!("context={}", name));
+        if let Some(name) = value {
+        lines.push(format!("context={name}"));
     }
 
     // Ensure parent dir exists

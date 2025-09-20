@@ -4,6 +4,7 @@
 //! and other sync backends.
 
 pub mod replica;
+pub mod helpers;
 
 use crate::error::{SyncError, TaskError};
 use crate::task::Task;

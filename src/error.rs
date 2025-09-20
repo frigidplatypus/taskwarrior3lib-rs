@@ -66,6 +66,19 @@ pub enum TaskError {
 
     #[error("Synchronization not configured")]
     SyncNotConfigured,
+
+    #[error("External tool missing: {0}")]
+    ExternalToolMissing(String),
+
+    #[error("External tool failed: {name} (exit: {exit_code:?}) stderr: {stderr}")]
+    ExternalToolFailed {
+        name: String,
+        exit_code: Option<i32>,
+        stderr: String,
+    },
+
+    #[error("Replica reload failed at {path}: {message}")]
+    ReplicaReloadFailed { message: String, path: std::path::PathBuf },
 }
 
 /// Configuration-related errors

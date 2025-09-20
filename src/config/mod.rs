@@ -114,7 +114,7 @@ impl Configuration {
 
     /// Discover contexts from current settings
     pub fn discover_contexts(&self) -> Result<Vec<context::UserContext>, ConfigError> {
-        Ok(context::discover_contexts(&self.settings)?)
+        context::discover_contexts(&self.settings)
     }
 
     /// Get a configuration value with default

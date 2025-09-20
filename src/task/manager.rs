@@ -51,7 +51,7 @@ pub trait TaskManager: ConfigurationProvider {
     fn add_task_with_options(
         &mut self,
         description: String,
-        options: AddOptions,
+        _options: AddOptions,
     ) -> Result<Task, TaskError> {
         // Default implementation forwards to add_task, ignoring options.
         // Implementations may override to honor options.

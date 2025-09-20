@@ -37,6 +37,9 @@ dirs = "5.0"
 # Optional async support
 tokio = { version = "1.0", features = ["full"], optional = true }
 
+# Optional TaskChampion integration (local SQLite replica)
+taskchampion = { version = "2", optional = true }
+
 [dev-dependencies]
 # Testing utilities
 tempfile = "3.0"
@@ -46,6 +49,7 @@ assert_matches = "1.5"
 [features]
 default = []
 async = ["tokio"]
+taskchampion = ["dep:taskchampion"]
 
 [[bench]]
 name = "query_performance"
