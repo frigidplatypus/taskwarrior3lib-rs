@@ -3,6 +3,7 @@ use crate::storage::operation_batch::Operation as Op;
 use crate::storage::replica_wrapper::ReplicaWrapper;
 use std::path::Path;
 use uuid::Uuid;
+#[cfg(feature = "taskchampion")]
 use std::sync::{Arc, Mutex};
 
 // Commands sent to the replica actor thread
@@ -163,7 +164,7 @@ pub fn open_taskchampion_replica(path: &Path) -> Result<Box<dyn ReplicaWrapper>,
                         return;
                     }
                 };
-
+                        use std::sync::Arc;
                 // signal successful startup
                 let _ = startup_tx.send(Ok(()));
 
@@ -384,6 +385,8 @@ pub fn open_taskchampion_replica(path: &Path) -> Result<Box<dyn ReplicaWrapper>,
     // Fallback stub when feature is not enabled
     #[cfg(not(feature = "taskchampion"))]
     {
+        // consume path to avoid unused variable warning when feature is disabled
+        let _ = path;
         Ok(Box::new(ReplicaTaskChampionStub))
     }
 }

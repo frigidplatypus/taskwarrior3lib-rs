@@ -8,6 +8,7 @@ pub mod context;
 
 use crate::error::{ConfigError, TaskError};
 use discovery::discover_all_paths;
+use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -69,10 +70,31 @@ impl Configuration {
 
     /// Load settings from .taskrc file
     fn load_from_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), ConfigError> {
-        let content = fs::read_to_string(path.as_ref()).map_err(|e| ConfigError::Io {
-            path: path.as_ref().to_path_buf(),
+        // Use a visited set to avoid recursive include loops
+        let mut visited: HashSet<PathBuf> = HashSet::new();
+        let start = path.as_ref().to_path_buf();
+        self.load_from_file_inner(&start, &mut visited)
+    }
+
+    // Internal helper that tracks visited files and supports include/import
+    fn load_from_file_inner(
+        &mut self,
+        path: &Path,
+        visited: &mut HashSet<PathBuf>,
+    ) -> Result<(), ConfigError> {
+        // Prevent include cycles
+        let canon = path.to_path_buf();
+        if visited.contains(&canon) {
+            return Ok(());
+        }
+        visited.insert(canon.clone());
+
+        let content = fs::read_to_string(path).map_err(|e| ConfigError::Io {
+            path: path.to_path_buf(),
             source: e,
         })?;
+
+        let parent = path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| PathBuf::from("."));
 
         for (line_num, line) in content.lines().enumerate() {
             let line = line.trim();
@@ -82,7 +104,24 @@ impl Configuration {
                 continue;
             }
 
-            // Parse key=value pairs
+            // Support include/import directives in two forms:
+            //   include /absolute/or/relative/path
+            //   include=/path
+            // Also accept `import` as an alias
+            if line.starts_with("include ") || line.starts_with("import ") {
+                if let Some((_kw, rest)) = line.split_once(' ') {
+                    let mut inc = rest.trim().to_string();
+                    if (inc.starts_with('"') && inc.ends_with('"')) || (inc.starts_with('\'') && inc.ends_with('\'')) {
+                        inc = inc[1..inc.len()-1].to_string();
+                    }
+                    let inc_path = PathBuf::from(inc);
+                    let resolved = if inc_path.is_relative() { parent.join(inc_path) } else { inc_path };
+                    self.load_from_file_inner(&resolved, visited)?;
+                    continue;
+                }
+            }
+
+            // Parse key=value pairs (also accept `key value`? For now use key=value)
             if let Some((raw_key, raw_value)) = line.split_once('=') {
                 let mut key = raw_key.trim().to_string();
                 // Normalize common Taskwarrior rc. prefix: accept keys like `rc.context.home`
@@ -95,6 +134,14 @@ impl Configuration {
                 if (value.starts_with('"') && value.ends_with('"')) || (value.starts_with('\'') && value.ends_with('\'')) {
                     // strip outer quotes
                     value = value[1..value.len()-1].to_string();
+                }
+
+                // Handle include/import written as key=value
+                if key == "include" || key == "import" {
+                    let inc_path = PathBuf::from(value);
+                    let resolved = if inc_path.is_relative() { parent.join(inc_path) } else { inc_path };
+                    self.load_from_file_inner(&resolved, visited)?;
+                    continue;
                 }
 
                 // Handle special keys
@@ -317,6 +364,28 @@ mod tests {
         assert_eq!(config.data_dir, PathBuf::from("/tmp/taskdata"));
         assert_eq!(config.get("verbose"), Some(&"on".to_string()));
         assert_eq!(config.get("confirmation"), Some(&"off".to_string()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_taskrc_includes_other_file() -> Result<(), Box<dyn std::error::Error>> {
+        use tempfile::NamedTempFile;
+        use std::io::Write;
+
+        // Create an included file with a setting
+        let mut inc = NamedTempFile::new()?;
+        writeln!(inc, "verbose=on")?;
+        let inc_path = inc.path().to_path_buf();
+
+        // Create a main taskrc that includes the other file
+        let mut main = NamedTempFile::new()?;
+        writeln!(main, "# main config")?;
+        writeln!(main, "include={}", inc_path.display())?;
+        let main_path = main.path().to_path_buf();
+
+        let cfg = Configuration::from_file(&main_path)?;
+        assert_eq!(cfg.get("verbose"), Some(&"on".to_string()));
 
         Ok(())
     }
