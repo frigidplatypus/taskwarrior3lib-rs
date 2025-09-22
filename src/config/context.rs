@@ -32,14 +32,28 @@ impl UserContext {
 pub fn discover_contexts(settings: &HashMap<String, String>) -> Result<Vec<UserContext>, ConfigError> {
     let mut contexts: Vec<UserContext> = Vec::new();
 
-    // First check for a global active context key: `context`
-    let active = settings.get("context").map(|s| s.to_string());
+    // First check for a global active context key: prefer `context`, but accept
+    // `rc.context` as some configurations use the rc. prefix for the active
+    // value as well.
+    let active = settings
+        .get("context")
+        .cloned()
+        .or_else(|| settings.get("rc.context").cloned());
 
-    // Iterate over keys like "context.name" (Taskwarrior uses `rc.context.<name>` in some cases)
+    // Iterate over keys like "context.name". Some Taskwarrior configurations use
+    // the `rc.` prefix (e.g. `rc.context.home`) so accept both variants by
+    // normalizing keys without mutating the original settings map.
     for (k, v) in settings {
-        if k.starts_with("context.") {
+        // accept either "context." or "rc.context." prefixes
+        let key = if k.starts_with("rc.context.") {
+            k.trim_start_matches("rc.")
+        } else {
+            k.as_str()
+        };
+
+        if key.starts_with("context.") {
             // key is "context.<name>"; extract name
-            if let Some(name) = k.strip_prefix("context.") {
+            if let Some(name) = key.strip_prefix("context.") {
                 // Skip nested keys like "context.<name>.write" which will be handled
                 // by looking up the specific "context.<name>.write" entry
                 if name.contains('.') {
@@ -49,7 +63,11 @@ pub fn discover_contexts(settings: &HashMap<String, String>) -> Result<Vec<UserC
                 // v is the read filter expression; Taskwarrior supports a separate write
                 // filter via `context.<name>.write` in newer versions; attempt to read it
                 let write_key = format!("context.{name}.write");
-                let write_filter = settings.get(&write_key).cloned();
+                // When fetching the write filter, also accept an rc-prefixed variant
+                let write_filter = settings
+                    .get(&write_key)
+                    .cloned()
+                    .or_else(|| settings.get(&format!("rc.{write_key}")).cloned());
 
                 // Basic validation: read filter must be non-empty
                 if v.trim().is_empty() {
@@ -309,5 +327,20 @@ mod tests {
             }
             _ => panic!("unexpected error type: {err:?}"),
         }
+    }
+
+    #[test]
+    fn test_discover_rc_prefixed_keys() {
+        let mut settings = HashMap::new();
+        // simulate Taskwarrior using rc-prefixed keys
+        settings.insert("rc.context".to_string(), "home".to_string());
+        settings.insert("rc.context.home".to_string(), "project:Home".to_string());
+
+        let contexts = discover_contexts(&settings).unwrap();
+        assert_eq!(contexts.len(), 1);
+        let home = &contexts[0];
+        assert_eq!(home.name, "home");
+        assert_eq!(home.read_filter, "project:Home");
+        assert!(home.active);
     }
 }

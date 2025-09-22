@@ -45,6 +45,11 @@ let q = TaskQueryBuilderImpl::new()
    .status(TaskStatus::Pending)
    .build()?;
 let tasks = task_manager.query_tasks(&q)?;
+
+Note about automatic reloads
+----------------------------
+
+The TaskManager will check your `.taskrc` mtime and automatically reload configuration if it changed since the last query. This makes context changes from other tools (or manual edits) visible to queries without restarting your application. For very high-frequency query loops you may wish to disable or throttle reloads; an opt-out or debounce can be added via configuration in a follow-up change.
 ```
 
 ## Ignore the active context

@@ -83,17 +83,27 @@ impl Configuration {
             }
 
             // Parse key=value pairs
-            if let Some((key, value)) = line.split_once('=') {
-                let key = key.trim();
-                let value = value.trim();
+            if let Some((raw_key, raw_value)) = line.split_once('=') {
+                let mut key = raw_key.trim().to_string();
+                // Normalize common Taskwarrior rc. prefix: accept keys like `rc.context.home`
+                if key.starts_with("rc.") {
+                    key = key.trim_start_matches("rc.").to_string();
+                }
+
+                // Unquote values if they are wrapped in single or double quotes
+                let mut value = raw_value.trim().to_string();
+                if (value.starts_with('"') && value.ends_with('"')) || (value.starts_with('\'') && value.ends_with('\'')) {
+                    // strip outer quotes
+                    value = value[1..value.len()-1].to_string();
+                }
 
                 // Handle special keys
-                match key {
+                match key.as_str() {
                     "data.location" => {
                         self.data_dir = PathBuf::from(value);
                     }
                     _ => {
-                        self.settings.insert(key.to_string(), value.to_string());
+                        self.settings.insert(key, value);
                     }
                 }
             } else {

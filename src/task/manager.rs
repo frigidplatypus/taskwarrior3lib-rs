@@ -71,16 +71,16 @@ pub trait TaskManager: ConfigurationProvider {
     fn complete_task(&mut self, id: Uuid) -> Result<Task, TaskError>;
 
     /// Query tasks with filters
-    fn query_tasks(&self, query: &TaskQuery) -> Result<Vec<Task>, TaskError>;
+    fn query_tasks(&mut self, query: &TaskQuery) -> Result<Vec<Task>, TaskError>;
 
     /// Get all pending tasks
-    fn pending_tasks(&self) -> Result<Vec<Task>, TaskError>;
+    fn pending_tasks(&mut self) -> Result<Vec<Task>, TaskError>;
 
     /// Get all completed tasks  
-    fn completed_tasks(&self) -> Result<Vec<Task>, TaskError>;
+    fn completed_tasks(&mut self) -> Result<Vec<Task>, TaskError>;
 
     /// Count tasks matching query
-    fn count_tasks(&self, query: &TaskQuery) -> Result<usize, TaskError>;
+    fn count_tasks(&mut self, query: &TaskQuery) -> Result<usize, TaskError>;
 
     /// Synchronize with remote server
     fn sync(&mut self) -> Result<SyncResult, TaskError>;
@@ -233,6 +233,8 @@ pub struct DefaultTaskManager {
     storage: Box<dyn StorageBackend>,
     hooks: Box<dyn HookSystem>,
     sync_manager: Option<Box<dyn SyncManager>>,
+    // Cached mtime of the configuration file to avoid reloading on every query
+    last_config_mtime: Option<std::time::SystemTime>,
 }
 
 impl DefaultTaskManager {
@@ -242,11 +244,18 @@ impl DefaultTaskManager {
         storage: Box<dyn StorageBackend>,
         hooks: Box<dyn HookSystem>,
     ) -> Result<Self, TaskError> {
+        // Determine initial mtime if the config file exists
+        let last_config_mtime = match std::fs::metadata(&config.config_file) {
+            Ok(meta) => meta.modified().ok(),
+            Err(_) => None,
+        };
+
         let mut manager = Self {
             config,
             storage,
             hooks,
             sync_manager: None,
+            last_config_mtime,
         };
 
         // Initialize storage
@@ -448,7 +457,19 @@ impl TaskManager for DefaultTaskManager {
         Ok(task)
     }
 
-    fn query_tasks(&self, query: &TaskQuery) -> Result<Vec<Task>, TaskError> {
+    fn query_tasks(&mut self, query: &TaskQuery) -> Result<Vec<Task>, TaskError> {
+        // Check whether the config file has changed since last time by
+        // comparing the file mtime. Only reload when it changed.
+    // Clone the PathBuf to avoid holding an immutable borrow on self
+    let cfg_path = self.config.config_file.clone();
+    let current_mtime = std::fs::metadata(&cfg_path).and_then(|m| m.modified()).ok();
+        if current_mtime != self.last_config_mtime {
+            // Attempt to reload; if this fails, propagate error
+            self.reload_config()?;
+            // Update cached mtime to the new value (may be None)
+            self.last_config_mtime = std::fs::metadata(&cfg_path).and_then(|m| m.modified()).ok();
+        }
+
         // Discover active context and pass it to storage backends. If
         // no context is active, pass None. Default behavior is to honor
         // the active context unless the query's filter_mode requests
@@ -494,7 +515,7 @@ impl TaskManager for DefaultTaskManager {
         }
     }
 
-    fn pending_tasks(&self) -> Result<Vec<Task>, TaskError> {
+    fn pending_tasks(&mut self) -> Result<Vec<Task>, TaskError> {
         let query = TaskQuery {
             status: Some(TaskStatus::Pending),
             project_filter: None,
@@ -508,7 +529,7 @@ impl TaskManager for DefaultTaskManager {
         self.query_tasks(&query)
     }
 
-    fn completed_tasks(&self) -> Result<Vec<Task>, TaskError> {
+    fn completed_tasks(&mut self) -> Result<Vec<Task>, TaskError> {
         let query = TaskQuery {
             status: Some(TaskStatus::Completed),
             project_filter: None,
@@ -522,7 +543,7 @@ impl TaskManager for DefaultTaskManager {
         self.query_tasks(&query)
     }
 
-    fn count_tasks(&self, query: &TaskQuery) -> Result<usize, TaskError> {
+    fn count_tasks(&mut self, query: &TaskQuery) -> Result<usize, TaskError> {
         let tasks = self.query_tasks(query)?;
         Ok(tasks.len())
     }

@@ -55,6 +55,11 @@ context::set(&mut cfg, "work")?;
 
 // Clear active context and persist
 context::clear(&mut cfg)?;
+
+Automatic reload behavior
+-------------------------
+
+The library will automatically detect changes to your `.taskrc` and reload configuration before running queries. This is implemented via a cached mtime check so that the file is only re-parsed when it changes. If you prefer to manage reloads yourself, you can call `reload_config()` on the configuration provider before operations.
 ```
 
 Persistence behavior:

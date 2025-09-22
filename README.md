@@ -196,6 +196,11 @@ let tasks = task_manager.query_tasks(&query)?;
 
 Discover, show, set, and clear Taskwarrior contexts programmatically:
 
+Note about automatic reloads
+----------------------------
+
+The library automatically reloads your Taskwarrior configuration (your `.taskrc`) before executing queries. It uses a lightweight mtime check and only re-parses the file when it has changed, so external edits (or other tools) are picked up promptly without introducing unnecessary file I/O. If you want to control this behavior (for example, to disable automatic reloads in a high-performance environment), you can call `reload_config()` manually or request an opt-out in the TaskManager builder in a future patch.
+
 ```rust
 use taskwarrior3lib::config::{Configuration, context};
 
