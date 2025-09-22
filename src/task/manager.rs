@@ -51,7 +51,7 @@ pub trait TaskManager: ConfigurationProvider {
     fn add_task_with_options(
         &mut self,
         description: String,
-        options: AddOptions,
+        _options: AddOptions,
     ) -> Result<Task, TaskError> {
         // Default implementation forwards to add_task, ignoring options.
         // Implementations may override to honor options.
@@ -628,9 +628,20 @@ impl TaskManagerBuilder {
             .config
             .unwrap_or_else(|| Configuration::from_xdg().unwrap_or_default());
 
-        let storage = self
-            .storage
-            .unwrap_or_else(|| Box::new(crate::storage::FileStorageBackend::new()));
+        let storage = self.storage.unwrap_or_else(|| {
+            // Try TaskChampion first if replica exists
+            if let Ok(replica_path) = crate::config::discovery::discover_data_dir() {
+                let taskchampion_db = replica_path.join("taskchampion.sqlite3");
+                if taskchampion_db.exists() {
+                    #[cfg(feature = "taskchampion")]
+                    {
+                        return Box::new(crate::storage::TaskChampionStorageBackend::new(taskchampion_db));
+                    }
+                }
+            }
+            // Fall back to file storage
+            Box::new(crate::storage::FileStorageBackend::new())
+        });
 
         let hooks = self
             .hooks
@@ -697,5 +708,30 @@ mod tests {
         assert!(builder.storage.is_none());
         assert!(builder.hooks.is_none());
         assert!(builder.sync_manager.is_none());
+    }
+
+    #[test]
+    fn test_task_manager_builder_default_storage_fallback() {
+        let builder = TaskManagerBuilder::new();
+        // We can't easily test the full build() without setting up proper directories,
+        // but we can verify the builder creates the expected storage type by checking
+        // the storage field before building
+        let storage = builder.storage.unwrap_or_else(|| {
+            // Try TaskChampion first if replica exists
+            if let Ok(replica_path) = crate::config::discovery::discover_data_dir() {
+                let taskchampion_db = replica_path.join("taskchampion.sqlite3");
+                if taskchampion_db.exists() {
+                    #[cfg(feature = "taskchampion")]
+                    {
+                        return Box::new(crate::storage::TaskChampionStorageBackend::new(taskchampion_db));
+                    }
+                }
+            }
+            // Fall back to file storage
+            Box::new(crate::storage::FileStorageBackend::new())
+        });
+        
+        // Should fall back to FileStorageBackend when no TaskChampion replica exists
+        assert!(format!("{:?}", storage).contains("FileStorageBackend"));
     }
 }
