@@ -49,18 +49,37 @@ pub fn discover_data_dir() -> Result<PathBuf, ConfigError> {
 pub fn discover_config_dir() -> Result<PathBuf, ConfigError> {
     // Priority order:
     // 1. XDG_CONFIG_HOME/taskwarrior
-    // 2. ~/.config/taskwarrior (fallback)
+    // 2. ~/.config/task (preferred) or ~/.config/taskwarrior (fallback)
 
     if let Ok(xdg_config) = env::var("XDG_CONFIG_HOME") {
         let xdg_path = PathBuf::from(&xdg_config);
         if xdg_path.is_absolute() {
-            let path = xdg_path.join("taskwarrior");
-            return Ok(path);
+            // Prefer 'task' if present, else 'taskwarrior', else return 'task' as default
+            let task_dir = xdg_path.join("task");
+            let taskwarrior_dir = xdg_path.join("taskwarrior");
+            if task_dir.exists() {
+                return Ok(task_dir);
+            }
+            if taskwarrior_dir.exists() {
+                return Ok(taskwarrior_dir);
+            }
+            // Default to taskwarrior for backwards compatibility in environments
+            // where neither directory exists.
+            return Ok(taskwarrior_dir);
         }
     }
 
     if let Some(home_dir) = dirs::home_dir() {
-        Ok(home_dir.join(".config").join("taskwarrior"))
+        let task_dir = home_dir.join(".config").join("task");
+        let taskwarrior_dir = home_dir.join(".config").join("taskwarrior");
+        if task_dir.exists() {
+            return Ok(task_dir);
+        }
+        if taskwarrior_dir.exists() {
+            return Ok(taskwarrior_dir);
+        }
+        // Default to ~/.config/taskwarrior for backwards compatibility
+        Ok(taskwarrior_dir)
     } else {
         Err(ConfigError::Environment {
             message: "Could not determine home directory for XDG config path".to_string(),

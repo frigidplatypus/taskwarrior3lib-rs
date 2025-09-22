@@ -108,7 +108,7 @@ impl Configuration {
             //   include /absolute/or/relative/path
             //   include=/path
             // Also accept `import` as an alias
-            if line.starts_with("include ") || line.starts_with("import ") {
+                if line.starts_with("include ") || line.starts_with("import ") {
                 if let Some((_kw, rest)) = line.split_once(' ') {
                     let mut inc = rest.trim().to_string();
                     if (inc.starts_with('"') && inc.ends_with('"')) || (inc.starts_with('\'') && inc.ends_with('\'')) {
@@ -116,7 +116,15 @@ impl Configuration {
                     }
                     let inc_path = PathBuf::from(inc);
                     let resolved = if inc_path.is_relative() { parent.join(inc_path) } else { inc_path };
-                    self.load_from_file_inner(&resolved, visited)?;
+                    // If an included file is missing, warn and continue instead of failing.
+                    if !resolved.exists() {
+                        eprintln!("Configuration: include/import not found, skipping: {}", resolved.display());
+                        continue;
+                    }
+                    if let Err(e) = self.load_from_file_inner(&resolved, visited) {
+                        eprintln!("Configuration: failed to load included file {}: {}", resolved.display(), e);
+                        continue;
+                    }
                     continue;
                 }
             }
@@ -140,7 +148,14 @@ impl Configuration {
                 if key == "include" || key == "import" {
                     let inc_path = PathBuf::from(value);
                     let resolved = if inc_path.is_relative() { parent.join(inc_path) } else { inc_path };
-                    self.load_from_file_inner(&resolved, visited)?;
+                    if !resolved.exists() {
+                        eprintln!("Configuration: include/import not found (key form), skipping: {}", resolved.display());
+                        continue;
+                    }
+                    if let Err(e) = self.load_from_file_inner(&resolved, visited) {
+                        eprintln!("Configuration: failed to load included file {}: {}", resolved.display(), e);
+                        continue;
+                    }
                     continue;
                 }
 

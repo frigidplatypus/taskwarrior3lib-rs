@@ -40,63 +40,94 @@ pub fn discover_contexts(settings: &HashMap<String, String>) -> Result<Vec<UserC
         .cloned()
         .or_else(|| settings.get("rc.context").cloned());
 
-    // Iterate over keys like "context.name". Some Taskwarrior configurations use
-    // the `rc.` prefix (e.g. `rc.context.home`) so accept both variants by
-    // normalizing keys without mutating the original settings map.
+    // Some Taskwarrior configurations express contexts as either
+    //   context.<name> = <read-filter>
+    // or
+    //   context.<name>.read = <read-filter>
+    //   context.<name>.write = <write-filter>
+    // Accept both styles and aggregate read/write filters per context name.
+    use std::collections::BTreeMap;
+    let mut ctx_map: BTreeMap<String, (Option<String>, Option<String>)> = BTreeMap::new();
+
     for (k, v) in settings {
-        // accept either "context." or "rc.context." prefixes
+        // normalize rc. prefix on keys that start with it
         let key = if k.starts_with("rc.context.") {
             k.trim_start_matches("rc.")
         } else {
             k.as_str()
         };
 
-        if key.starts_with("context.") {
-            // key is "context.<name>"; extract name
-            if let Some(name) = key.strip_prefix("context.") {
-                // Skip nested keys like "context.<name>.write" which will be handled
-                // by looking up the specific "context.<name>.write" entry
-                if name.contains('.') {
-                    continue;
+        if !key.starts_with("context.") {
+            continue;
+        }
+
+        // remainder after "context." (e.g. "home", "home.read", "home.write")
+        if let Some(remainder) = key.strip_prefix("context.") {
+            if remainder.ends_with(".read") {
+                if let Some(name) = remainder.strip_suffix(".read") {
+                    ctx_map
+                        .entry(name.to_string())
+                        .or_insert((None, None))
+                        .0 = Some(v.clone());
                 }
-
-                // v is the read filter expression; Taskwarrior supports a separate write
-                // filter via `context.<name>.write` in newer versions; attempt to read it
-                let write_key = format!("context.{name}.write");
-                // When fetching the write filter, also accept an rc-prefixed variant
-                let write_filter = settings
-                    .get(&write_key)
-                    .cloned()
-                    .or_else(|| settings.get(&format!("rc.{write_key}")).cloned());
-
-                // Basic validation: read filter must be non-empty
-                if v.trim().is_empty() {
-                    return Err(ConfigError::InvalidValue {
-                        key: format!("context.{name}"),
-                        value: v.clone(),
-                        expected: "non-empty filter expression".to_string(),
-                    });
+            } else if remainder.ends_with(".write") {
+                if let Some(name) = remainder.strip_suffix(".write") {
+                    ctx_map
+                        .entry(name.to_string())
+                        .or_insert((None, None))
+                        .1 = Some(v.clone());
                 }
-
-                // Validate write filter shape if present (we currently support only project:<name>)
-                if let Some(ref wf) = write_filter {
-                    if parse_project_from_filter(wf).is_none() {
-                        return Err(ConfigError::InvalidValue {
-                            key: write_key.clone(),
-                            value: wf.clone(),
-                            expected: "simple project filter like project:Name or project=Name".to_string(),
-                        });
-                    }
-                }
-
-                let is_active = match &active {
-                    Some(a) => a == name,
-                    None => false,
-                };
-
-                contexts.push(UserContext::new(name.to_string(), v.clone(), write_filter, is_active));
+            } else if !remainder.contains('.') {
+                // plain `context.<name>` style
+                ctx_map
+                    .entry(remainder.to_string())
+                    .or_insert((None, None))
+                    .0 = Some(v.clone());
+            } else {
+                // skip unexpected nested keys like context.<name>.<other>
+                continue;
             }
         }
+    }
+
+    // Convert aggregated map into UserContext objects
+    for (name, (read_opt, write_opt)) in ctx_map {
+        let read = match read_opt {
+            Some(r) => r,
+            None => {
+                return Err(ConfigError::InvalidValue {
+                    key: format!("context.{}", name),
+                    value: "".to_string(),
+                    expected: "non-empty filter expression".to_string(),
+                });
+            }
+        };
+
+        if read.trim().is_empty() {
+            return Err(ConfigError::InvalidValue {
+                key: format!("context.{}", name),
+                value: read.clone(),
+                expected: "non-empty filter expression".to_string(),
+            });
+        }
+
+        // Validate write filter if present
+        if let Some(ref wf) = write_opt {
+            if parse_project_from_filter(wf).is_none() {
+                return Err(ConfigError::InvalidValue {
+                    key: format!("context.{}.write", name),
+                    value: wf.clone(),
+                    expected: "simple project filter like project:Name or project=Name".to_string(),
+                });
+            }
+        }
+
+        let is_active = match &active {
+            Some(a) => a == &name,
+            None => false,
+        };
+
+        contexts.push(UserContext::new(name.to_string(), read, write_opt, is_active));
     }
 
     Ok(contexts)
