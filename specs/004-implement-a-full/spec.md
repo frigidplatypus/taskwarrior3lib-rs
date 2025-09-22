@@ -82,6 +82,53 @@ A developer uses the Taskwarrior 3 Rust library and wants a default, production-
 
 ---
 
+## Helper: run_task_sync_and_reload_replica
+
+This spec exposes a small convenience helper that libraries or higher-level consumers can call to ensure the local TaskChampion replica is synchronized with the system Taskwarrior sync server (when present) and then reload the in-memory Replica state used by the TaskChampion storage backend.
+
+Rationale: users who rely on Taskwarrior's sync server may prefer to invoke the system `task sync` command (which handles transport and remote servers) and then have the library refresh its local Replica view. Implementing native sync transports is out-of-scope for this feature; this helper provides a pragmatic bridge.
+
+Signature (Rust):
+
+```rust
+/// Runs the system `task sync` command (if available) and reloads the given ReplicaWrapper.
+///
+/// Inputs:
+/// - `replica_path`: path to the on-disk TaskChampion replica directory (used to re-open the Replica)
+/// - `timeout`: optional Duration to apply to the sync process execution (to avoid hanging)
+///
+/// Returns: Result<(), TaskError>
+pub fn run_task_sync_and_reload_replica(replica_path: &Path, timeout: Option<Duration>) -> Result<(), TaskError>;
+```
+
+Behavior:
+- If the `task` executable is not found on PATH, the helper returns Err(TaskError::ExternalToolMissing{"task"}) and does not attempt to reload the Replica.
+- The helper spawns `task sync` as a child process with the provided timeout (if any). The process's stdout/stderr are captured and included in the TaskError::ExternalToolFailed on failure.
+- If `task sync` exits successfully (exit code 0), the helper attempts to re-open the Replica at `replica_path` (via ReplicaWrapper::open or similar) and replaces the in-memory Replica instance used by the storage backend. If Replica re-open fails (IO error, lock, incompatible schema), an Err(TaskError::ReplicaReloadFailed{source, path}) is returned.
+- If `task sync` returns non-zero exit code or is terminated by a signal, the helper returns Err(TaskError::ExternalToolFailed{ exit_code: Some(code), stdout, stderr }).
+- The helper must not modify user files beyond invoking `task sync` and re-opening the Replica; any migration behavior must be opt-in and documented separately.
+
+Error Modes (mapped to TaskError variants):
+- ExternalToolMissing("task") -> executable not found on PATH
+- ExternalToolFailed { exit_code: Option<i32>, stdout: String, stderr: String } -> `task sync` failed
+- ReplicaReloadFailed { source: io::Error, path: PathBuf } -> Error re-opening the Replica after sync
+- TimeoutExpired -> If the helper had a timeout and the child did not finish in time
+
+Testing / Acceptance Criteria:
+- Unit test: mock process runner (or use a small integration harness) so the helper can be tested without actually calling system `task`. Validate that:
+   - When process runner returns success, the Replica open is called and succeeds, and the function returns Ok(())
+   - When process runner returns non-zero, helper returns ExternalToolFailed with captured stdout/stderr
+   - When `task` is missing (simulate PATH lookup failure), helper returns ExternalToolMissing
+- Integration test (optional, gated): run only if `task` is present on the test host and a disposable Replica is available. Test steps:
+   1. Prepare a disposable TaskChampion replica directory with one or two sample tasks
+   2. Configure the system `task` to point at that replica (environment variables or configuration) — this can be complex; therefore, the integration test should be optional and documented.
+   3. Call `run_task_sync_and_reload_replica(...)` and ensure it returns Ok(()) and that the storage backend's in-memory view includes any changes synced by `task sync`.
+
+Implementation notes:
+- Use std::process::Command to locate and execute `task` with appropriate arguments. Consider using a small process-runner trait to allow mocking in unit tests.
+- Ensure the helper is robust to partial failures and surface clear errors for each failure mode.
+- Keep the helper opt-in for code that wants to call it; do not call it implicitly during initialization.
+
 ## Execution Status
 *Updated by main() during processing*
 

@@ -16,4 +16,9 @@ pub trait ReplicaWrapper: Send + Sync {
 
     /// Read a task by uuid
     fn read_task(&self, id: Uuid) -> Result<Option<crate::task::Task>, TaskError>;
+    
+    /// Get the last operations committed (for testing)
+    fn get_last_operations(&self) -> Option<Vec<Op>> {
+        None
+    }
 }

@@ -5,7 +5,7 @@ Contract: run_task_sync_and_reload_replica
 Signature:
 
 ```rust
-pub fn run_task_sync_and_reload_replica(replica_path: &Path, timeout: Option<Duration>) -> Result<(), TaskError>;
+pub fn run_task_sync_and_reload_replica(replica_path: &Path, runner: &dyn ProcessRunner) -> Result<(), TaskError>;
 ```
 
 Behavioral contract:
@@ -20,7 +20,7 @@ Contract tests (failing tests to be implemented):
   - Expect: function returns Ok(()) and Replica open is called
 
 - test_helper_missing_task
-  - Setup: mock PATH lookup to fail
+  - Setup: mock process runner to simulate missing task (e.g., command not found)
   - Expect: Err(TaskError::ExternalToolMissing("task"))
 
 - test_helper_sync_failure

@@ -64,6 +64,11 @@ impl TaskChampionStorageBackend {
     pub fn set_replica(&mut self, replica: Box<dyn crate::storage::replica_wrapper::ReplicaWrapper>) {
         self.replica = Some(replica);
     }
+    
+    /// Get the last operations committed (for testing).
+    pub fn get_last_operations(&self) -> Option<Vec<crate::storage::operation_batch::Operation>> {
+        self.replica.as_ref()?.get_last_operations()
+    }
 
     /// Convert database row to Task
     fn row_to_task(&self, row: &Row) -> Result<Task, rusqlite::Error> {
@@ -184,7 +189,7 @@ impl StorageBackend for TaskChampionStorageBackend {
 
     fn save_task(&mut self, _task: &Task) -> Result<(), TaskError> {
         // Build operation batch for the task
-        use crate::storage::operation_batch::{build_save_batch};
+        use crate::storage::operation_batch::build_save_batch;
 
         // If a replica wrapper is injected (tests), avoid touching the DB schema
         // and assume no existing task unless we can read it via the replica.
@@ -198,6 +203,7 @@ impl StorageBackend for TaskChampionStorageBackend {
         let ops = build_save_batch(existing.as_ref(), _task);
 
         if let Some(replica) = &mut self.replica {
+            // The replica wrapper now handles translation to TaskChampion operations internally
             replica.commit_operations(&ops).map_err(|e| TaskError::Storage { source: StorageError::Database { message: format!("Failed to commit operations: {e}") } })?;
             Ok(())
         } else {

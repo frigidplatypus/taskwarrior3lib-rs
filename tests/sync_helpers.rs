@@ -1,4 +1,5 @@
 use taskwarrior3lib::io::{ProcessResult, ProcessRunner};
+use taskwarrior3lib::io::process_runner::ProcessError;
 use taskwarrior3lib::sync::helpers::run_task_sync_and_reload_replica;
 use tempfile::tempdir;
 
@@ -8,7 +9,7 @@ struct FakeRunnerSuccess {
 }
 
 impl ProcessRunner for FakeRunnerSuccess {
-    fn run(&self, cmd: &str, args: &[&str], _timeout: Option<std::time::Duration>) -> std::io::Result<ProcessResult> {
+    fn run(&self, cmd: &str, args: &[&str], _timeout: Option<std::time::Duration>) -> Result<ProcessResult, ProcessError> {
         let mut guard = self.last_cmd.lock().unwrap();
         *guard = Some((cmd.to_string(), args.iter().map(|s| s.to_string()).collect()));
         Ok(ProcessResult { exit_code: 0, stdout: "ok".into(), stderr: "".into() })

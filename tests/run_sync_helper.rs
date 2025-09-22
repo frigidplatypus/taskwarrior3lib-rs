@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use taskwarrior3lib::io::{ProcessResult, ProcessRunner};
+use taskwarrior3lib::io::process_runner::ProcessError;
 
 #[derive(Default)]
 struct FakeRunner {
@@ -7,7 +8,7 @@ struct FakeRunner {
 }
 
 impl ProcessRunner for FakeRunner {
-    fn run(&self, cmd: &str, args: &[&str], _timeout: Option<std::time::Duration>) -> std::io::Result<ProcessResult> {
+    fn run(&self, cmd: &str, args: &[&str], _timeout: Option<std::time::Duration>) -> Result<ProcessResult, ProcessError> {
         let mut guard = self.last_cmd.lock().unwrap();
         *guard = Some((cmd.to_string(), args.iter().map(|s| s.to_string()).collect()));
         Ok(ProcessResult { exit_code: 0, stdout: "ok".into(), stderr: "".into() })

@@ -9,4 +9,7 @@ pub mod process_runner;
 // Re-export main functionality
 pub use export::TaskExporter;
 pub use import::TaskImporter;
-pub use process_runner::{ProcessResult, ProcessRunner, SystemProcessRunner};
+pub use process_runner::{ProcessResult, ProcessRunner, SystemProcessRunner, default_runner};
+
+#[cfg(any(test, feature = "taskchampion"))]
+pub use process_runner::MockProcessRunner;

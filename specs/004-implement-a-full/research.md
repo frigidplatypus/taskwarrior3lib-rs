@@ -1,3 +1,48 @@
+# Research: taskchampion (v2.0.3) — operations surface and mapping guidance
+
+This note summarizes findings from the taskchampion v2.0.3 docs (docs.rs) related to building and committing operations to a local Replica, and recommends how the library should map our internal fine-grained Operation enum to TaskChampion operations.
+
+Status
+- Docs reviewed: taskchampion v2.0.3 (docs.rs)
+- Key pages: `TaskData`, `Task`, `Operation` (enum) and `Operations` (type alias)
+
+Key facts
+- Low-level operations are represented by the enum `taskchampion::Operation` with variants: `Create { uuid }`, `Delete { uuid, old_task }`, `Update { uuid, property, old_value, value, timestamp }`, and `UndoPoint`.
+- `Operations` is a type alias for `Vec<Operation>` and is what you pass to replica methods (for example, `Replica::commit_operations`).
+- `TaskData` is a low-level key/value view of task fields; it exposes helpers such as:
+  - `TaskData::create(uuid, ops)` — build a new TaskData and add the appropriate Create/update operations into `ops`.
+  - `TaskData::update(property, Option<String>, ops)` — set a property's value (Some) or remove it entirely (None). This pushes an `Operation::Update` into `ops`.
+  - `TaskData::delete(ops)` — delete the task entirely (produces a `Delete`).
+- `Task` is a higher-level, ergonomic snapshot type built on top of TaskData. It exposes convenient methods that mutate a `Task` and append appropriate `Operations`, e.g.:
+  - `add_tag(tag, ops)` / `remove_tag(tag, ops)`
+  - `add_dependency(uuid, ops)` / `remove_dependency(uuid, ops)`
+  - `add_annotation` / `remove_annotation`
+  - `set_value`, `set_priority`, `set_due`, `set_status`, `start`/`stop`, etc.
+
+Implications for per-item removals (tags / dependencies / annotation removal)
+- There are two practical ways to produce a per-item change:
+ 1) Use the high-level `Task` helpers (e.g. `Task::remove_tag`) which append explicit `Operation::Update` entries for the right property and value. These are preferred for clarity and correctness when you have an existing task snapshot.
+ 2) Use `TaskData::update(property, Option<String>, ops)` for lower-level key/value updates. `update(..., None, ops)` deletes the entire property; it does not provide a built-in "remove single tag" helper. Historically, Taskwarrior text-based updates used a `-value` convention to remove one item from a list (eg. `tags`), and some code paths use that convention by writing `update("tags", Some(format!("-{}", tag)), ops)`.
+
+Recommended mapping strategy for our internal Operation enum
+- For Create/Delete/full-property updates: continue to use `TaskData::create` and `TaskData::update(property, Some/None, ops)`.
+- For per-item tag/dependency/annotation changes: prefer using the `Task` API when we can (i.e. fetch a `Task` snapshot from the Replica, call `add_tag`/`remove_tag`/`add_dependency`/`remove_dependency`/`add_annotation`/`remove_annotation`, and commit the resulting `Operations`). This produces explicit, documented operations and avoids relying on textual conventions.
+- If (for architectural or performance reasons) we cannot fetch a `Task` snapshot, fall back to constructing the appropriate `TaskData::update` call. For per-item removals there are two sub-options:
+  - If the taskchampion API provides a higher-level helper (via `Task` or other helpers) use it.
+  - Otherwise use the historical `-value` convention when updating list-like properties (eg. `tags`, `depends`) by calling `TaskData::update("tags", Some(format!("-{}", tag)), &mut ops)` and add a code comment pointing to this research note.
+
+Practical notes and next steps
+- `Operation::Update`'s `value: Option<String>` semantics are explicit: `None` removes the whole property; Some(string) sets it. The `Task` helpers handle granular changes and will generate the right `Update` operations internally.
+- Replica commits expect an `Operations` value (Vec<Operation>) — build these via the replica-aware mapping helper (`map_ops_to_tc_operations_with_replica`) so we can prefer Task helper methods. Keep using `Replica::commit_operations(ops)` inside the actor thread.
+- Next code tasks:
+  1) Update mapping code to prefer `Task` helpers for per-item changes by obtaining a snapshot from the Replica (eg. `replica.get_task(uuid)` or `replica.task(uuid)` — see Replica API) and calling the helper methods that append to an `Operations` vec.
+  2) Keep a fallback path that uses the `-value` text convention when a Task snapshot is unavailable. Add thorough tests that assert the produced `Operation` entries (preferably by inspecting `Operation` values rather than Debug strings).
+
+References
+- docs.rs: taskchampion 2.0.3 — TaskData, Task, Operation, Operations
+- Source: operation/Task implementation links visible on docs.rs (see `Task` and `Operation` pages for method signatures)
+
+If you want, I can implement step 1 (prefer Task helpers) in the actor mapping code: I will add a code path that tries to fetch a `Task` snapshot from the Replica and use its helper methods to build `Operations` for per-item changes, falling back to `TaskData::update` when snapshot fetch fails. Also I can update tests to check `Operation` enum contents directly.
 # Phase 0 — Research Notes
 
 Decision: Implement a local-only TaskChampion storage backend that uses `taskchampion::Replica` and `taskchampion::storage::StorageConfig::OnDisk`.
